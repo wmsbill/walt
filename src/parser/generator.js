@@ -146,6 +146,26 @@ export const generateBinaryExpression = (node, parent) => {
   return block;
 };
 
+export const generateTernary = (node, parent) => {
+  const mapper = mapSyntax(parent);
+  const block = node.operands.slice(0, 1)
+    .map(mapper)
+    .reduce(mergeBlock, []);
+
+  block.push({
+    kind: opcodeFromOperator(node),
+    valueType: generateValueType(node)
+  });
+  block.push.apply(block, node.operands.slice(1, 2).map(mapper).reduce(mergeBlock, []));
+  block.push({
+    kind: opcodeFromOperator({ operator: { value: ':' } })
+  });
+  block.push.apply(block, node.operands.slice(-1).map(mapper).reduce(mergeBlock, []));
+  block.push({ kind: opcode.End });
+
+  return block;
+}
+
 export const generateAssignment = (node, parent) => {
   const subParent = { postfix: [] };
   const block = node.operands.slice(1)
@@ -174,6 +194,7 @@ const syntaxMap = {
   // Unary
   [Syntax.Constant]: getConstOpcode,
   [Syntax.BinaryExpression]: generateBinaryExpression,
+  [Syntax.TernaryExpression]: generateTernary,
   [Syntax.Identifier]: getInScope,
   [Syntax.ReturnStatement]: generateReturn,
   // Binary

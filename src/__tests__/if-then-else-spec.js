@@ -16,8 +16,6 @@ test.skip('if statement', t =>
 test('ternary', t =>
   compileAndRun(`
   export function test(): i32 {
-    let y: i32 = 1;
-    let x: i32 = 2;
-    return x > y ? 42 : 24;
-  }`)
+    return 1 ? 42 : 24;
+  }`).then(outputIs(t, 42))
 );
