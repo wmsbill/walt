@@ -16,6 +16,7 @@ export const getAst = source => {
 };
 
 export const getIR = source => {
+  debugger;
   const ast = getAst(source);
   const wasm = emit(ast);
   return wasm;

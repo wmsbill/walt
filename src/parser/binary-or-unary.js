@@ -34,6 +34,7 @@ function unary(ctx, opts) {
 
 // Abstraction for handling operations
 function binaryOrUnary(ctx, type, operator, operands) {
+  debugger;
   switch(operator.value) {
     case '++':
     case '--':

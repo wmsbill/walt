@@ -35,7 +35,7 @@ const expression = (
 ) => {
   const operators = [];
   const operands = [];
-
+  debugger;
   const consume = () =>
     operands.push(binaryOrUnary(ctx, type, operators.pop(), operands));
 

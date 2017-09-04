@@ -9,6 +9,7 @@ const precedence = {
   '==': 2,
   '!=': 2,
   '=': 3,
+  '?': 4
 };
 export default precedence;
 

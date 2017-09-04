@@ -2,6 +2,7 @@ const Syntax = {
   Keyword: 'Keyword',
   Export: 'Export',
   Statement: 'Statement',
+  IfCondition: 'IfCondition',
   BinaryExpression: 'BinaryExpression',
   UnaryExpression: 'UnaryExpression',
   NumberLiteral: 'NumberLiteral',
