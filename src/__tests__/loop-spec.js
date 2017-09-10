@@ -8,10 +8,12 @@ test('for loop', t =>
   compileAndRun(`
   export function test(x: i32): i32 {
     let y: i32 = 0;
-    for(y = 0; y <= x; y++) {
+    let i: i32 = 0;
+    for(y = 0; y <= x; y = y + 1) {
+      i = 0 - y;
     }
-    return y;
+    return i;
   }
-  `).then(outputIs(t, 42, 42))
+  `).then(outputIs(t, -41, 42))
 );
 

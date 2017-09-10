@@ -16,6 +16,7 @@ const Syntax = {
   Declaration: 'Declaration',
   FunctionDeclaration: 'FunctionDeclaration',
   FunctionCall: 'FunctionCall',
+  ForLoop: 'ForLoop',
   Program: 'Program',
   Assignment: 'Assignment',
   Param: 'Param',

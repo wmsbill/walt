@@ -27,15 +27,5 @@ const compile = source => {
   return wasm.buffer();
 }
 
-const toBuffer = source => {
-  const defaultBuffer = compile(source);
-  const buffer = new Buffer.alloc(defaultBuffer.byteLength);
-  const view = new Uint8Array(defaultBuffer);
-  for(let i = 0; i < buffer.byteLength; i++) {
-    buffer[i] = view[i];
-  }
-  return buffer;
-}
-
 export default compile;
 

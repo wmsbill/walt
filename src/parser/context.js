@@ -2,7 +2,7 @@
 import { getType, generateImport, generateElement } from './generator';
 import { EXTERN_TABLE } from '../emitter/external_kind';
 import TokenStream from '../utils/token-stream';
-import type { Token, Node, TypeNode } from '../flow/types';
+import type { Token, Node, TypeNode, AnyNode } from '../flow/types';
 
 const generateErrorString = (
   msg:string,

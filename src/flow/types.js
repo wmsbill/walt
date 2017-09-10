@@ -14,22 +14,18 @@ export type Token = {
 }
 
 // Nodes
+export type Typed = { id?: string, type: string };
 export type Node = {
   start: Marker,
   range: Marker[],
-  Type?: string,
   end?: Marker,
+  Type?: string,
+  id?: string,
+  type?: string,
+  result?: Typed | null,
+  params?: Node[],
+  body?: Node[]
 };
-
-export type Typed = { id?: string, type: string };
-export type TypeNode =
-  {
-    id: string,
-    params: Typed[],
-    result: Typed | null
-  }
-  & Node
-  & Typed;
 
 export type Field = {
   id: string,
