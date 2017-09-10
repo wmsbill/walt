@@ -3,6 +3,7 @@ import maybeFunctionDeclaration from './maybe-function-declaration';
 import _export from './export';
 import _import from './import';
 import type from './type';
+import forLoop from './for-loop';
 import returnStatement from './return-statement';
 import ifThenElse from './if-then-else';
 
@@ -21,6 +22,8 @@ const keyword = (ctx) => {
       return type(ctx);
     case 'if':
       return ifThenElse(ctx);
+    case 'for':
+      return forLoop(ctx);
     case 'return':
       return returnStatement(ctx);
     default:
