@@ -32,7 +32,7 @@ const maybeIdentifier = (ctx: Context): Node => {
   } else if (isFuncitonCall) {
     // if function call then encode it as such
     return functionCall(ctx);
-  } else if (isArraySubscript) {
+  } else if (false && isArraySubscript) {
     return arraySubscript(ctx);
   }
 

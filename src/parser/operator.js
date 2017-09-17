@@ -15,6 +15,8 @@ function binary(ctx: Context, operator: OperatorToken, params: Node[]) {
   if (node.value === '=') {
     Type = Syntax.Assignment;
     ctx.diAssoc = 'right';
+  } else if (node.value === '[') {
+    Type = Syntax.ArraySubscript;
   }
 
   return ctx.endNode(node, Type);

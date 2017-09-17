@@ -140,7 +140,6 @@ class Context {
   startNode(token: any = this.token): Node {
     return {
       value: token.value,
-      start: token.start,
       range: [token.start],
       params: []
     };
@@ -151,7 +150,6 @@ class Context {
     return {
       ...node,
       Type,
-      end: token.end,
       range: node.range.concat(token.end)
     };
   }

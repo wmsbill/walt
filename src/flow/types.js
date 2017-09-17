@@ -24,9 +24,7 @@ export type OperatorToken =
 // Nodes
 export type Typed = { id?: string, type: string };
 export type Node = {
-  start: Marker,
   range: Marker[],
-  end?: Marker,
   Type?: string,
   id?: string,
   type?: string,

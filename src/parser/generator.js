@@ -141,7 +141,15 @@ export const generateArrayDeclaration = (node, parent) => {
 }
 
 export const generateArraySubscript = (node, parent) => {
-  const block = [];
+  const block = node.params
+    .map(mapSyntax(parent))
+    .reduce(mergeBlock, []);
+
+  block.push({
+    kind: opcodeFromOperator(node),
+    params: [4, 0]
+  });
+
   return block;
 }
 

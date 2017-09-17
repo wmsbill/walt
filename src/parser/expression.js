@@ -34,6 +34,8 @@ const valueIs = (v: string) => (o: OperatorToken): boolean => o.value === v;
 
 const isLBracket = valueIs('(');
 const isRBracket = valueIs(')');
+const isRSqrBracket = valueIs(']');
+const isLSqrBracket = valueIs('[');
 const isTStart = valueIs('?');
 const isTEnd = valueIs(':');
 const hasLBracket = ops => ops.find(isLBracket);
@@ -84,7 +86,7 @@ const expression = (
         op.assoc = assoc(op.value);
       }
 
-      if (isLBracket(op)) {
+      if (isLBracket(op) || isLSqrBracket(op)) {
         operators.push(op);
       } else if (isTEnd(op)) {
         eatUntil(isTStart);
@@ -95,6 +97,11 @@ const expression = (
 
         // Pop left bracket
         operators.pop();
+      } else if (isRSqrBracket(op)) {
+        eatUntil(isLSqrBracket);
+        // instead of popping the square bracket (like the parens) we consume it
+        // and create a array-subscript operation
+        consume();
       } else {
         while(last(operators)
           && last(operators).precedence >= op.precedence
