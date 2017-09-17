@@ -13,6 +13,14 @@ export type Token = {
   value: string
 }
 
+export type OperatorToken =
+  Token
+  & {
+    precedence: number,
+    assoc: string,
+    type: string
+  };
+
 // Nodes
 export type Typed = { id?: string, type: string };
 export type Node = {
@@ -22,9 +30,11 @@ export type Node = {
   Type?: string,
   id?: string,
   type?: string,
+  value?: string,
+  size?: number,
   result?: Typed | null,
-  params?: Node[],
-  body?: Node?[]
+  params: Node[],
+  body?: Node[]
 };
 
 export type Field = {

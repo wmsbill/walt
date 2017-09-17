@@ -135,12 +135,22 @@ export const generateDeclaration = (node, parent) => {
   return block;
 };
 
+export const generateArrayDeclaration = (node, parent) => {
+  const block = [];
+  return block;
+}
+
+export const generateArraySubscript = (node, parent) => {
+  const block = [];
+  return block;
+}
+
 /**
  * Transform a binary expression node into a list of opcodes
  */
 export const generateBinaryExpression = (node, parent) => {
   // Map operands first
-  const block = node.operands
+  const block = node.params
     .map(mapSyntax(parent))
     .reduce(mergeBlock, []);
 
@@ -152,7 +162,7 @@ export const generateBinaryExpression = (node, parent) => {
   if (node.isPostfix && parent) {
     parent.postfix.push(block);
     // Simply return the left-hand
-    return node.operands.slice(0, 1).map(mapSyntax(parent)).reduce(mergeBlock, []);
+    return node.params.slice(0, 1).map(mapSyntax(parent)).reduce(mergeBlock, []);
   }
 
   // Map the operator last
@@ -165,7 +175,7 @@ export const generateBinaryExpression = (node, parent) => {
 
 export const generateTernary = (node, parent) => {
   const mapper = mapSyntax(parent);
-  const block = node.operands.slice(0, 1)
+  const block = node.params.slice(0, 1)
     .map(mapper)
     .reduce(mergeBlock, []);
 
@@ -173,11 +183,11 @@ export const generateTernary = (node, parent) => {
     kind: opcodeFromOperator(node),
     valueType: generateValueType(node)
   });
-  block.push.apply(block, node.operands.slice(1, 2).map(mapper).reduce(mergeBlock, []));
+  block.push.apply(block, node.params.slice(1, 2).map(mapper).reduce(mergeBlock, []));
   block.push({
-    kind: opcodeFromOperator({ operator: { value: ':' } })
+    kind: opcodeFromOperator({ value: ':' })
   });
-  block.push.apply(block, node.operands.slice(-1).map(mapper).reduce(mergeBlock, []));
+  block.push.apply(block, node.params.slice(-1).map(mapper).reduce(mergeBlock, []));
   block.push({ kind: opcode.End });
 
   return block;
@@ -185,11 +195,11 @@ export const generateTernary = (node, parent) => {
 
 export const generateAssignment = (node, parent) => {
   const subParent = { postfix: [] };
-  const block = node.operands.slice(1)
+  const block = node.params.slice(1)
     .map(mapSyntax(subParent))
     .reduce(mergeBlock, []);
 
-  block.push(setInScope(node.operands[0]));
+  block.push(setInScope(node.params[0]));
 
   return subParent.postfix.reduce(mergeBlock, block);
 };
@@ -260,7 +270,7 @@ export const generateLoop = (node, parent) => {
   };
 
   const condition = node.params.slice(1, 2);
-  condition[0].operator.value = reverse[condition[0].operator.value];
+  condition[0].value = reverse[condition[0].value];
   const expression = node.params.slice(2, 3);
 
   block.push({ kind: opcode.Block, params: [0x40] });
@@ -292,7 +302,10 @@ const syntaxMap = {
   [Syntax.ReturnStatement]: generateReturn,
   // Binary
   [Syntax.Declaration]: generateDeclaration,
+  [Syntax.ArrayDeclaration]: generateArrayDeclaration,
+  [Syntax.ArraySubscript]: generateArraySubscript,
   [Syntax.Assignment]: generateAssignment,
+  // Imports
   [Syntax.Import]: generateImport,
   // Loops
   [Syntax.Loop]: generateLoop

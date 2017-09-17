@@ -17,13 +17,12 @@ function maybeAssignment(ctx) {
       ctx.eat(['=']);
     }
     const assignment = ctx.startNode();
-    assignment.operator = { value: '=' };
     // Push the reference to the local/global
-    assignment.operands = [target];
+    assignment.params = [target];
     const expr = expression(ctx);
     // not a postfix
     expr.isPostfix = false;
-    assignment.operands.push(expr);
+    assignment.params.push(expr);
     return ctx.endNode(assignment, Syntax.Assignment);
   }
 

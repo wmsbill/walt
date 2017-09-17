@@ -1,7 +1,7 @@
 //@flow
 import Syntax from '../Syntax';
 import Context from './context';
-import expression from './expression';
+import expression, { predicate } from './expression';
 import statement from './statement';
 import type { Node } from '../flow/types';
 
@@ -12,7 +12,11 @@ const whileLoop = (ctx: Context): Node => {
 
   node.params = [
     null,
-    expression(ctx, 'i32', true)
+    expression(
+      ctx,
+      'i32',
+      token => predicate(token) && token.value !== ')'
+    )
   ];
 
   ctx.expect([')']);

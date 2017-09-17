@@ -1,6 +1,10 @@
+// @flow
 import Syntax from '../Syntax';
 import { generateInit } from './generator';
 import expression from './expression';
+import Context from './context';
+import type { Node } from '../flow/types';
+import { importMemory } from './implicit-imports';
 
 const generate = (ctx, node) => {
   if (!ctx.func) {
@@ -13,7 +17,23 @@ const generate = (ctx, node) => {
   }
 }
 
-const declaration = (ctx) => {
+const arrayDeclaration = (node: Node, ctx: Context): Node => {
+  ctx.expect([']']);
+  ctx.expect(['=']);
+
+  if (ctx.eat(['new'], Syntax.Keyword)) {
+    ctx.expect(['Array']);
+    ctx.expect(['(']);
+    node.size = parseInt(ctx.expect(null, Syntax.Constant).value);
+    ctx.expect([')']);
+  }
+
+  importMemory(ctx);
+
+  return ctx.endNode(node, Syntax.ArrayDeclaration);
+}
+
+const declaration = (ctx: Context): Node => {
   const node = ctx.startNode();
   node.const = ctx.token.value === 'const';
   if (!ctx.eat(['const', 'let', 'function']))
@@ -23,6 +43,9 @@ const declaration = (ctx) => {
   ctx.expect([':']);
 
   node.type = ctx.expect(null, Syntax.Type).value;
+  if (ctx.eat(['['])) {
+    return arrayDeclaration(node, ctx);
+  }
 
   if (ctx.eat(['=']))
     node.init = expression(ctx, node.type);

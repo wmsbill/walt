@@ -14,7 +14,9 @@ const emitLocal = (stream, local) => {
 
 const emitFunctionBody = (stream, { locals, code }) => {
   // write bytecode into a clean buffer
+  debugger;
   const body = new OutputStream();
+
   code.forEach(({ kind, params, valueType }) => {
     // There is a much nicer way of doing this
     body.push(u8, kind.code, kind.text);

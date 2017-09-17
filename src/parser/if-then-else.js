@@ -2,7 +2,7 @@
 import Syntax from '../Syntax';
 import Context from './context';
 import statement from './statement';
-import expression from './expression';
+import expression, { predicate } from './expression';
 
 const ifThenElse = (ctx: Context) => {
   const node = {
@@ -14,7 +14,11 @@ const ifThenElse = (ctx: Context) => {
 
   // First operand is the expression
   ctx.expect(['(']);
-  node.expr = expression(ctx, 'i32', true);
+  node.expr = expression(
+    ctx,
+    'i32',
+    token => predicate(token) && token.value !== ')'
+  );
   ctx.expect([')']);
 
   // maybe a curly brace or not

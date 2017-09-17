@@ -1,7 +1,7 @@
 //@flow
 import Syntax from '../Syntax';
 import Context from './context';
-import expression from './expression';
+import expression, { predicate } from './expression';
 import statement from './statement';
 import type { Node } from '../flow/types';
 
@@ -10,7 +10,11 @@ const paramList = (ctx: Context): Node[] => {
   const params: Node[] = [];
   let node = null;
   while(ctx.token.value && ctx.token.value !== ')') {
-    node = expression(ctx, 'i32', true);
+    node = expression(
+      ctx,
+      'i32',
+      (token) => predicate(token) && token.value !== ')'
+    );
     if (node) {
       params.push(node);
       ctx.eat([';']);

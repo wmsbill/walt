@@ -1,25 +1,30 @@
 //@flow
 import Syntax from '../Syntax'
 import functionCall from './function-call';
+import arraySubscript from './array-subscript';
 import Context from './context';
 import type { Node } from '../flow/types';
-
-const functionPointer = (ctx: Context, node: Node): Node => {
-
-}
+import { writeFunctionPointer } from './implicit-imports';
+import {
+  findLocalIndex,
+  findGlobalIndex,
+  findFunctionIndex
+} from './introspection';
 
 // Maybe identifier, maybe function call
 const maybeIdentifier = (ctx: Context): Node => {
   const node = ctx.startNode();
-  const localIndex = ctx.func.locals.findIndex(l => l.id === ctx.token.value);
-  const globalIndex = ctx.globals.findIndex(g => g.id === ctx.token.value);
-  const functionIndex = ctx.functions.findIndex(f => f.id === ctx.token.value);
-  const isFuncitonCall = ctx.stream.peek().value === '(';
+  const localIndex = findLocalIndex(ctx, ctx.token);
+  const globalIndex = findGlobalIndex(ctx, ctx.token);
+  const functionIndex = findFunctionIndex(ctx, ctx.token);
+  const nextToken = ctx.stream.peek();
+  const isFuncitonCall = nextToken.value === '(';
+  const isArraySubscript = nextToken.value === '[';
 
   // Function pointer
   if (!isFuncitonCall && localIndex < 0 && globalIndex < 0 && functionIndex > -1) {
     // Save the element
-    ctx.writeFunctionPointer(functionIndex);
+    writeFunctionPointer(ctx, functionIndex);
     // Encode a function pointer as a i32.const representing the function index
     const tableIndex = ctx.Program.Element.findIndex(e => e.functionIndex === functionIndex);
     node.value = tableIndex;
@@ -27,6 +32,8 @@ const maybeIdentifier = (ctx: Context): Node => {
   } else if (isFuncitonCall) {
     // if function call then encode it as such
     return functionCall(ctx);
+  } else if (isArraySubscript) {
+    return arraySubscript(ctx);
   }
 
   // Not a function call or pointer, look-up variables

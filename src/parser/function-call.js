@@ -1,7 +1,7 @@
 // @flow
 import Syntax from '../Syntax';
 import Context from './context';
-import expression from './expression';
+import expression, { predicate } from './expression';
 
 const argumentList = (ctx: Context, type: string): Node[] => {
   const list: Node[] = [];
@@ -14,7 +14,7 @@ const argumentList = (ctx: Context, type: string): Node[] => {
 }
 
 const argument = (ctx, type: string): Node => {
-  const node = expression(ctx, type, true);
+  const node = expression(ctx, type, token => predicate(token) && token.value !== ')');
   ctx.eat([',']);
   return node;
 }

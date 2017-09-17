@@ -1,6 +1,5 @@
 // @flow
-import { getType, generateImport, generateElement } from './generator';
-import { EXTERN_TABLE } from '../emitter/external_kind';
+import { getType } from './generator';
 import TokenStream from '../utils/token-stream';
 import generateErrorString from '../utils/generate-error';
 import type { Token, Node } from '../flow/types';
@@ -13,7 +12,9 @@ export const findTypeIndex = (node: Node, Types: Node[]): number => {
         true
       );
 
-    const resultMatch = t.result == node.result || t.result === getType(node.result.type);
+    const resultMatch =
+      t.result == node.result ||
+      (node.result && t.result === getType(node.result.type));
 
     return paramsMatch && resultMatch;
   });
@@ -66,7 +67,8 @@ class Context {
       Imports: [],
       Globals: [],
       Element: [],
-      Functions: []
+      Functions: [],
+      Memory: []
     };
   }
 
@@ -136,7 +138,12 @@ class Context {
   }
 
   startNode(token: any = this.token): Node {
-    return { start: token.start, range: [token.start] };
+    return {
+      value: token.value,
+      start: token.start,
+      range: [token.start],
+      params: []
+    };
   }
 
   endNode(node: Node, Type: string): Node {
@@ -147,27 +154,6 @@ class Context {
       end: token.end,
       range: node.range.concat(token.end)
     };
-  }
-
-  writeFunctionPointer(functionIndex: number): void {
-    if (!this.Program.Element.length) {
-      this.Program.Imports.push.apply(
-        this.Program.Imports,
-        generateImport({
-          module: 'env',
-          fields: [{
-            id: 'table',
-            kind: EXTERN_TABLE
-          }]
-        }));
-    }
-
-    const exists = this.Program.Element.find(
-      n => n.functionIndex === functionIndex
-    );
-    if (exists == null) {
-      this.Program.Element.push(generateElement(functionIndex));
-    }
   }
 }
 
