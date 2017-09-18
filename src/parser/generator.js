@@ -137,17 +137,44 @@ export const generateDeclaration = (node, parent) => {
 
 export const generateArrayDeclaration = (node, parent) => {
   const block = [];
+  debugger;
+  if (node.init) {
+    block.push.apply(block, generateExpression(node.init));
+    block.push({ kind: opcode.SetLocal, params: [node.localIndex] });
+  }
+  parent.locals.push(generateValueType(node));
   return block;
 }
 
 export const generateArraySubscript = (node, parent) => {
-  const block = node.params
+  // We need to create a copy of the node and generate a binary addition.
+  //
+  // Memory Address = param[0] + param[1];
+  //
+  // Where param[0] is an Idetntifier and param[1] is the expression inside of
+  // the square brackets.
+  const addNode = { ...node, params: node.params.slice(0, 2), value: '+' };
+  const addressBlock = generateBinaryExpression(addNode, parent);
+
+  // now we generate the value block if any
+  const block = node.params.slice(2)
     .map(mapSyntax(parent))
     .reduce(mergeBlock, []);
 
+  block.push.apply(block, addressBlock);
+
+  const setOrLoad = node.meta[0] || 'Load';
+
+  // THe last piece is the WASM opcode. Either load or store
   block.push({
-    kind: opcodeFromOperator(node),
-    params: [4, 0]
+    kind: opcode[node.type + setOrLoad],
+    params: [
+      // Alignment
+      // TODO: make this extendible
+      2,
+      // Memory. Always 0 in the WASM MVP
+      0
+    ]
   });
 
   return block;

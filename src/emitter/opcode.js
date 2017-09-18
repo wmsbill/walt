@@ -247,6 +247,8 @@ export const opcodeFromOperator = ({ type, value }) => {
       return def.If;
     case ':':
       return def.Else;
+    case '[':
+      return def[type + 'Load'];
     default:
       throw new Error(`No mapping from operator to opcode ${value}`);
   };

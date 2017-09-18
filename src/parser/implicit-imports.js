@@ -1,14 +1,24 @@
 // @flow
 import Context from './context';
-import { EXTERN_TABLE, EXTERN_MEMORY } from '../emitter/external_kind';
-import { generateImport, generateElement } from './generator';
+import {
+  EXTERN_TABLE,
+  EXTERN_MEMORY,
+  EXTERN_FUNCTION
+} from '../emitter/external_kind';
+import {
+  generateType,
+  generateImport,
+  generateElement
+} from './generator';
 
 const memoryImport = generateImport({
   module: 'env',
-  fields: [{
-    id: 'memory',
-    kind: EXTERN_MEMORY
-  }]
+  fields: [
+    {
+      id: 'memory',
+      kind: EXTERN_MEMORY
+    }
+  ]
 });
 
 export const writeFunctionPointer = (
@@ -41,6 +51,27 @@ export const importMemory = (ctx: Context): void => {
       ctx.Program.Imports,
       memoryImport
     );
+
+    const newNode = {
+      id: 'new',
+      params: [{ type: 'i32', isParam: true }],
+      result: 'i32',
+      typeIndex: 1 // ctx.Program.Types.length
+    };
+
+    ctx.Program.Types.push(generateType(newNode));
+    ctx.Program.Imports.push.apply(
+      ctx.Program.Imports,
+      generateImport({
+        module: 'env',
+        fields: [{
+          id: 'new',
+          kind: EXTERN_FUNCTION,
+          typeIndex: newNode.typeIndex
+        }]
+      })
+    );
+    ctx.Program.Functions.push(null);
   }
 }
 

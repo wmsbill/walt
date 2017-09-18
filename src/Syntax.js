@@ -21,6 +21,7 @@ const Syntax = {
   FunctionCall: 'FunctionCall',
   Loop: 'Loop',
   Program: 'Program',
+  MemoryAssignment: 'MemoryAssignment',
   Assignment: 'Assignment',
   Param: 'Param',
   Typedef: 'Typedef',

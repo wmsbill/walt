@@ -25,12 +25,13 @@ export type OperatorToken =
 export type Typed = { id?: string, type: string };
 export type Node = {
   range: Marker[],
-  Type?: string,
+  Type: string,
   id?: string,
   type?: string,
-  value?: string,
+  value: string,
   size?: number,
   result?: Typed | null,
+  meta: any[],
   params: Node[],
   body?: Node[]
 };

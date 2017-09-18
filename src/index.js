@@ -23,6 +23,7 @@ export const getIR = source => {
 // Compiles a raw binary wasm buffer
 const compile = source => {
   const wasm = getIR(source);
+  console.log(wasm.debug());
   return wasm.buffer();
 }
 

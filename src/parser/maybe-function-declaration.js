@@ -69,7 +69,7 @@ const maybeFunctionDeclaration = (ctx) => {
     ctx.Program.Types.push(generateType(node));
   }
   // attach to a type index
-  node.functionIndex = ctx.Program.Functions.length;
+  node.functionIndex = ctx.Program.Functions.length + 1;
   ctx.Program.Functions.push(node.typeIndex);
   ctx.functions.push(node);
 

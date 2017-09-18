@@ -139,8 +139,10 @@ class Context {
 
   startNode(token: any = this.token): Node {
     return {
+      Type: '',
       value: token.value,
       range: [token.start],
+      meta: [],
       params: []
     };
   }

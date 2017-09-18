@@ -1,7 +1,6 @@
 //@flow
 import Syntax from '../Syntax'
 import functionCall from './function-call';
-import arraySubscript from './array-subscript';
 import Context from './context';
 import type { Node } from '../flow/types';
 import { writeFunctionPointer } from './implicit-imports';
@@ -32,8 +31,6 @@ const maybeIdentifier = (ctx: Context): Node => {
   } else if (isFuncitonCall) {
     // if function call then encode it as such
     return functionCall(ctx);
-  } else if (false && isArraySubscript) {
-    return arraySubscript(ctx);
   }
 
   // Not a function call or pointer, look-up variables

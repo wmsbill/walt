@@ -21,14 +21,27 @@ const arrayDeclaration = (node: Node, ctx: Context): Node => {
   ctx.expect([']']);
   ctx.expect(['=']);
 
+  importMemory(ctx);
+
   if (ctx.eat(['new'], Syntax.Keyword)) {
+    const init = ctx.startNode();
     ctx.expect(['Array']);
     ctx.expect(['(']);
     node.size = parseInt(ctx.expect(null, Syntax.Constant).value);
     ctx.expect([')']);
+
+    init.id = 'new';
+    init.arguments = [{
+      value: 14,
+      Type: Syntax.Constant,
+      type: 'i32'
+    }];
+    init.functionIndex = 0;
+
+    node.init = ctx.endNode(init, Syntax.FunctionCall);
   }
 
-  importMemory(ctx);
+  generate(ctx, node);
 
   return ctx.endNode(node, Syntax.ArrayDeclaration);
 }
