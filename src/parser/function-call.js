@@ -39,15 +39,16 @@ const functionCall = (ctx: Context) => {
       }, Syntax.Identifier)
     ];
   } else {
-    node.functionIndex = ctx.functions.findIndex(({ id }) => id == node.id);
-
-    if (node.functionIndex === -1)
+    const func = ctx.functions.find(({ id }) => id == node.id);
+    if (!func)
       throw ctx.syntaxError(`Undefined function: ${node.id}`);
+
+    node.meta.push({ ...func.meta[0] });
   }
 
   const proto = ctx.functions[node.functionIndex];
 
-  node.arguments = argumentList(ctx, (proto && proto.type) || 'i32');
+  node.params = argumentList(ctx, (proto && proto.type) || 'i32');
 
   return ctx.endNode(node, Type);
 }

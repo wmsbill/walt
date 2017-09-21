@@ -48,15 +48,18 @@ class Context {
   func: Node;
   Program: any;
   lines: string[];
+  functionImports: Node[];
 
-  constructor(options: ContextOptions = {
-    body: [],
-    diAssoc: 'right',
-    globals: [],
-    functions: [],
-    lines: []
-  }) {
-    Object.assign(this, options);
+  constructor(options: ContextOptions) {
+    Object.assign(this, {
+      body: [],
+      diAssoc: 'right',
+      globals: [],
+      functions: [],
+      lines: [],
+      functionImports: [],
+      ...options
+    });
 
     this.Program = {
       body: [],
@@ -154,6 +157,13 @@ class Context {
       Type,
       range: node.range.concat(token.end)
     };
+  }
+
+  makeNode(node: any, syntax: string): Node {
+    return this.endNode({
+      ...this.startNode(),
+      ...node
+    }, syntax);
   }
 }
 

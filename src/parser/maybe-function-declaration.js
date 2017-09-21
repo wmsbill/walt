@@ -4,7 +4,7 @@ import {
   generateCode,
   getType
 } from './generator';
-import { findTypeIndex } from './context';
+import { findTypeIndex } from './introspection';
 import statement from './statement';
 import declaration from './declaration';
 
@@ -61,15 +61,23 @@ const maybeFunctionDeclaration = (ctx) => {
   // we parse the body as the body may refer to the function
   // itself recursively
   // Either re-use an existing type or write a new one
-  const typeIndex = findTypeIndex(node, ctx.Program.Types);
+  const typeIndex = findTypeIndex(node, ctx);
   if(typeIndex !== -1) {
     node.typeIndex = typeIndex;
   } else {
+    // attach to a type index
     node.typeIndex = ctx.Program.Types.length;
     ctx.Program.Types.push(generateType(node));
   }
-  // attach to a type index
-  node.functionIndex = ctx.Program.Functions.length + 1;
+
+  node.meta = [
+    {
+      get functionIndex() {
+        return node.functionIndex.length + ctx.functionImportsLength;
+      }
+    }
+  ];
+  node.functionIndex = ctx.Program.Functions.length;
   ctx.Program.Functions.push(node.typeIndex);
   ctx.functions.push(node);
 

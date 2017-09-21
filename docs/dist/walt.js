@@ -152,14 +152,17 @@ const Syntax = {
   StringLiteral: 'StringLiteral',
   Punctuator: 'Punctuator',
   Identifier: 'Identifier',
+  ArraySubscript: 'ArraySubscript',
   Constant: 'Constant',
   Type: 'Type',
   Declaration: 'Declaration',
   FunctionDeclaration: 'FunctionDeclaration',
+  ArrayDeclaration: 'ArrayDeclaration',
   IndirectFunctionCall: 'IndirectFunctionCall',
   FunctionCall: 'FunctionCall',
   Loop: 'Loop',
   Program: 'Program',
+  MemoryAssignment: 'MemoryAssignment',
   Assignment: 'Assignment',
   Param: 'Param',
   Typedef: 'Typedef',
@@ -168,7 +171,7 @@ const Syntax = {
 
 var Syntax_1 = Syntax;
 
-const supported = ['+', '++', '-', '--', '=', '==', '=>', '<=', '!=', '%', '/', '^', '&', '|', '!', '**', ':', '(', ')', '.', '{', '}', ',', ';', '>', '<', '?'];
+const supported = ['+', '++', '-', '--', '=', '==', '=>', '<=', '!=', '%', '/', '^', '&', '|', '!', '**', ':', '(', ')', '.', '{', '}', ',', '[', ']', ';', '>', '<', '?'];
 
 const trie = new trie$1(supported);
 var index = token(trie.fsearch, Syntax_1.Punctuator, supported);
@@ -496,7 +499,7 @@ var index_16 = index$4.sizeof;
 
 const EXTERN_FUNCTION = 0;
 const EXTERN_TABLE = 1;
-
+const EXTERN_MEMORY = 2;
 const EXTERN_GLOBAL = 3;
 
 const getTypeString = type => {
@@ -745,7 +748,7 @@ opcode(index_3, index_2, ___, 0, 0xbf, 'f32Reinterpreti64', "f64.reinterpret/i64
 /**
  * Return opcode mapping to the operator. Signed result is always prefered
  */
-const opcodeFromOperator = ({ type, operator: { value } }) => {
+const opcodeFromOperator = ({ type, value }) => {
   switch (value) {
     case '+':
       return def[type + 'Add'];
@@ -773,6 +776,8 @@ const opcodeFromOperator = ({ type, operator: { value } }) => {
       return def.If;
     case ':':
       return def.Else;
+    case '[':
+      return def[type + 'Load'];
     default:
       throw new Error(`No mapping from operator to opcode ${value}`);
   }
@@ -911,6 +916,20 @@ curry.adapt = function (fn) {
 
 var curry_1$1 = curry;
 
+var _extends = Object.assign || function (target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i];
+
+    for (var key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        target[key] = source[key];
+      }
+    }
+  }
+
+  return target;
+};
+
 // clean this up
 const getType = str => {
   switch (str) {
@@ -1042,12 +1061,54 @@ const generateDeclaration = (node, parent) => {
   return block;
 };
 
+const generateArrayDeclaration = (node, parent) => {
+  const block = [];
+  debugger;
+  if (node.init) {
+    block.push.apply(block, generateExpression(node.init));
+    block.push({ kind: def.SetLocal, params: [node.localIndex] });
+  }
+  parent.locals.push(generateValueType(node));
+  return block;
+};
+
+const generateArraySubscript = (node, parent) => {
+  // We need to create a copy of the node and generate a binary addition.
+  //
+  // Memory Address = param[0] + param[1];
+  //
+  // Where param[0] is an Idetntifier and param[1] is the expression inside of
+  // the square brackets.
+  const addNode = _extends({}, node, { params: node.params.slice(0, 2), value: '+' });
+  const addressBlock = generateBinaryExpression(addNode, parent);
+
+  // now we generate the value block if any
+  const block = node.params.slice(2).map(mapSyntax(parent)).reduce(mergeBlock, []);
+
+  block.push.apply(block, addressBlock);
+
+  const setOrLoad = node.meta[0] || 'Load';
+
+  // THe last piece is the WASM opcode. Either load or store
+  block.push({
+    kind: def[node.type + setOrLoad],
+    params: [
+    // Alignment
+    // TODO: make this extendible
+    2,
+    // Memory. Always 0 in the WASM MVP
+    0]
+  });
+
+  return block;
+};
+
 /**
  * Transform a binary expression node into a list of opcodes
  */
 const generateBinaryExpression = (node, parent) => {
   // Map operands first
-  const block = node.operands.map(mapSyntax(parent)).reduce(mergeBlock, []);
+  const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 
   // Increment and decrement make this less clean:
   // If either increment or decrement then:
@@ -1057,7 +1118,7 @@ const generateBinaryExpression = (node, parent) => {
   if (node.isPostfix && parent) {
     parent.postfix.push(block);
     // Simply return the left-hand
-    return node.operands.slice(0, 1).map(mapSyntax(parent)).reduce(mergeBlock, []);
+    return node.params.slice(0, 1).map(mapSyntax(parent)).reduce(mergeBlock, []);
   }
 
   // Map the operator last
@@ -1070,17 +1131,17 @@ const generateBinaryExpression = (node, parent) => {
 
 const generateTernary = (node, parent) => {
   const mapper = mapSyntax(parent);
-  const block = node.operands.slice(0, 1).map(mapper).reduce(mergeBlock, []);
+  const block = node.params.slice(0, 1).map(mapper).reduce(mergeBlock, []);
 
   block.push({
     kind: opcodeFromOperator(node),
     valueType: generateValueType(node)
   });
-  block.push.apply(block, node.operands.slice(1, 2).map(mapper).reduce(mergeBlock, []));
+  block.push.apply(block, node.params.slice(1, 2).map(mapper).reduce(mergeBlock, []));
   block.push({
-    kind: opcodeFromOperator({ operator: { value: ':' } })
+    kind: opcodeFromOperator({ value: ':' })
   });
-  block.push.apply(block, node.operands.slice(-1).map(mapper).reduce(mergeBlock, []));
+  block.push.apply(block, node.params.slice(-1).map(mapper).reduce(mergeBlock, []));
   block.push({ kind: def.End });
 
   return block;
@@ -1088,9 +1149,9 @@ const generateTernary = (node, parent) => {
 
 const generateAssignment = (node, parent) => {
   const subParent = { postfix: [] };
-  const block = node.operands.slice(1).map(mapSyntax(subParent)).reduce(mergeBlock, []);
+  const block = node.params.slice(1).map(mapSyntax(subParent)).reduce(mergeBlock, []);
 
-  block.push(setInScope(node.operands[0]));
+  block.push(setInScope(node.params[0]));
 
   return subParent.postfix.reduce(mergeBlock, block);
 };
@@ -1157,7 +1218,7 @@ const generateLoop = (node, parent) => {
   };
 
   const condition = node.params.slice(1, 2);
-  condition[0].operator.value = reverse[condition[0].operator.value];
+  condition[0].value = reverse[condition[0].value];
   const expression = node.params.slice(2, 3);
 
   block.push({ kind: def.Block, params: [0x40] });
@@ -1189,7 +1250,10 @@ const syntaxMap = {
   [Syntax_1.ReturnStatement]: generateReturn,
   // Binary
   [Syntax_1.Declaration]: generateDeclaration,
+  [Syntax_1.ArrayDeclaration]: generateArrayDeclaration,
+  [Syntax_1.ArraySubscript]: generateArraySubscript,
   [Syntax_1.Assignment]: generateAssignment,
+  // Imports
   [Syntax_1.Import]: generateImport,
   // Loops
   [Syntax_1.Loop]: generateLoop
@@ -1267,26 +1331,12 @@ ${msg}
   at ${func} (${filename}:${line}:${col})`;
 };
 
-var _extends = Object.assign || function (target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i];
-
-    for (var key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        target[key] = source[key];
-      }
-    }
-  }
-
-  return target;
-};
-
 //      
 const findTypeIndex = (node, Types) => {
   return Types.findIndex(t => {
     const paramsMatch = t.params.length === node.params.length && t.params.reduce((a, v, i) => node.params[i] && a && v === getType(node.params[i].type), true);
 
-    const resultMatch = t.result == node.result || t.result === getType(node.result.type);
+    const resultMatch = t.result == node.result || node.result && t.result === getType(node.result.type);
 
     return paramsMatch && resultMatch;
   });
@@ -1320,7 +1370,8 @@ class Context {
       Imports: [],
       Globals: [],
       Element: [],
-      Functions: []
+      Functions: [],
+      Memory: []
     };
   }
 
@@ -1375,81 +1426,83 @@ class Context {
   }
 
   startNode(token = this.token) {
-    return { start: token.start, range: [token.start] };
+    return {
+      Type: '',
+      value: token.value,
+      range: [token.start],
+      meta: [],
+      params: []
+    };
   }
 
   endNode(node, Type) {
     const token = this.token || this.stream.last();
     return _extends({}, node, {
       Type,
-      end: token.end,
       range: node.range.concat(token.end)
     });
-  }
-
-  writeFunctionPointer(functionIndex) {
-    if (!this.Program.Element.length) {
-      this.Program.Imports.push.apply(this.Program.Imports, generateImport({
-        module: 'env',
-        fields: [{
-          id: 'table',
-          kind: EXTERN_TABLE
-        }]
-      }));
-    }
-
-    const exists = this.Program.Element.find(n => n.functionIndex === functionIndex);
-    if (exists == null) {
-      this.Program.Element.push(generateElement(functionIndex));
-    }
   }
 }
 
 //      
-function binary(ctx, opts) {
-  const node = Object.assign(ctx.startNode(opts.operands[0]), opts);
+function binary(ctx, operator, params) {
+  const node = ctx.startNode(params[0]);
+  node.value = operator.value;
+  node.params = params;
+  node.type = operator.type;
+  node.isPostfix = operator.isPostfix;
 
   ctx.diAssoc = 'left';
   let Type = Syntax_1.BinaryExpression;
-  if (node.operator.value === '=') {
+  if (node.value === '=') {
     Type = Syntax_1.Assignment;
     ctx.diAssoc = 'right';
+  } else if (node.value === '[') {
+    Type = Syntax_1.ArraySubscript;
   }
 
   return ctx.endNode(node, Type);
 }
 
-function unary(ctx, opts) {
+function unary(ctx, operator, params) {
   // Since WebAssembly has no 'native' support for incr/decr _opcode_ it's much simpler to
   // convert this unary to a binary expression by throwing in an extra operand of 1
-  if (opts.operator.value === '--' || opts.operator.value === '++') {
+  if (operator.value === '--' || operator.value === '++') {
     // set isPostfix to help the IR generator
-    const bopts = _extends({}, opts, {
-      isPostfix: opts.operator.assoc === 'left'
-    });
-    bopts.operator.value = opts.operator.value[0];
-    bopts.operands.push({ Type: Syntax_1.Constant, value: '1' });
-    return binary(ctx, bopts);
+    // TODO: abstract this to the generator?
+    const newParams = [...params];
+    const newOperator = _extends({}, operator);
+    newOperator.value = operator.value[0];
+    newOperator.isPostfix = operator.assoc === 'left';
+    newParams.push({ Type: Syntax_1.Constant, value: '1' });
+    return binary(ctx, newOperator, newParams);
   }
-  const node = Object.assign(ctx.startNode(opts.operands[0]), opts);
+  const node = ctx.startNode(params[0]);
+  node.params = params;
+  node.value = operator.value;
+
   return ctx.endNode(node, Syntax_1.UnaryExpression);
 }
 
-const ternary = (ctx, options) => {
-  const node = _extends({}, ctx.startNode(options.operands[0]), options);
+const ternary = (ctx, operator, params) => {
+  const node = ctx.startNode(params[0]);
+  node.params = params;
+  node.value = operator.value;
+  node.type = operator.type;
+
   return ctx.endNode(node, Syntax_1.TernaryExpression);
 };
 
 // Abstraction for handling operations
-const operator = (ctx, options) => {
-  switch (options.operator.value) {
+const operator = (ctx, operator, operands) => {
+  switch (operator.value) {
     case '++':
     case '--':
-      return unary(ctx, _extends({}, options, { operands: options.operands.splice(-1) }));
+      return unary(ctx, operator, operands.splice(-1));
     case '?':
-      return ternary(ctx, _extends({}, options, { operands: options.operands.splice(-3) }));
+      return ternary(ctx, operator, operands.splice(-3));
     default:
-      return binary(ctx, _extends({}, options, { operands: options.operands.splice(-2) }));
+      return binary(ctx, operator, operands.splice(-2));
   }
 };
 
@@ -1487,7 +1540,7 @@ const argumentList = (ctx, type) => {
 };
 
 const argument = (ctx, type) => {
-  const node = expression(ctx, type, true);
+  const node = expression(ctx, type, token => predicate(token) && token.value !== ')');
   ctx.eat([',']);
   return node;
 };
@@ -1522,19 +1575,89 @@ const functionCall = ctx => {
   return ctx.endNode(node, Type);
 };
 
+//      
+const memoryImport = generateImport({
+  module: 'env',
+  fields: [{
+    id: 'memory',
+    kind: EXTERN_MEMORY
+  }]
+});
+
+const writeFunctionPointer = (ctx, functionIndex) => {
+  if (!ctx.Program.Element.length) {
+    ctx.Program.Imports.push.apply(ctx.Program.Imports, generateImport({
+      module: 'env',
+      fields: [{
+        id: 'table',
+        kind: EXTERN_TABLE
+      }]
+    }));
+  }
+
+  const exists = ctx.Program.Element.find(n => n.functionIndex === functionIndex);
+  if (exists == null) {
+    ctx.Program.Element.push(generateElement(functionIndex));
+  }
+};
+
+const importMemory = ctx => {
+  if (!ctx.Program.Imports.find(({ kind }) => kind === EXTERN_MEMORY)) {
+    ctx.Program.Imports.push.apply(ctx.Program.Imports, memoryImport);
+
+    const newNode = {
+      id: 'new',
+      params: [{ type: 'i32', isParam: true }],
+      result: 'i32',
+      typeIndex: 1 // ctx.Program.Types.length
+    };
+
+    ctx.Program.Types.push(generateType(newNode));
+    ctx.Program.Imports.push.apply(ctx.Program.Imports, generateImport({
+      module: 'env',
+      fields: [{
+        id: 'new',
+        kind: EXTERN_FUNCTION,
+        typeIndex: newNode.typeIndex
+      }]
+    }));
+    ctx.Program.Functions.push(null);
+  }
+};
+
+//      
+const findFieldIndex = fields => (ctx, token) => {
+  let field = fields.reduce((memo, f) => {
+    if (memo) return memo[f];
+    return memo;
+  }, ctx);
+
+  if (field) {
+    return field.findIndex(node => node.id === token.value);
+  }
+
+  return -1;
+};
+
+const findLocalIndex = findFieldIndex(['func', 'locals']);
+const findGlobalIndex = findFieldIndex(['globals']);
+const findFunctionIndex = findFieldIndex(['functions']);
+
 //     
 // Maybe identifier, maybe function call
 const maybeIdentifier = ctx => {
   const node = ctx.startNode();
-  const localIndex = ctx.func.locals.findIndex(l => l.id === ctx.token.value);
-  const globalIndex = ctx.globals.findIndex(g => g.id === ctx.token.value);
-  const functionIndex = ctx.functions.findIndex(f => f.id === ctx.token.value);
-  const isFuncitonCall = ctx.stream.peek().value === '(';
+  const localIndex = findLocalIndex(ctx, ctx.token);
+  const globalIndex = findGlobalIndex(ctx, ctx.token);
+  const functionIndex = findFunctionIndex(ctx, ctx.token);
+  const nextToken = ctx.stream.peek();
+  const isFuncitonCall = nextToken.value === '(';
+  const isArraySubscript = nextToken.value === '[';
 
   // Function pointer
   if (!isFuncitonCall && localIndex < 0 && globalIndex < 0 && functionIndex > -1) {
     // Save the element
-    ctx.writeFunctionPointer(functionIndex);
+    writeFunctionPointer(ctx, functionIndex);
     // Encode a function pointer as a i32.const representing the function index
     const tableIndex = ctx.Program.Element.findIndex(e => e.functionIndex === functionIndex);
     node.value = tableIndex;
@@ -1559,6 +1682,7 @@ const maybeIdentifier = ctx => {
   return ctx.endNode(node, Syntax_1.Identifier);
 };
 
+//      
 const last = list => list[list.length - 1];
 
 const assoc = op => {
@@ -1579,32 +1703,38 @@ const assoc = op => {
   }
 };
 
-const isLBracket = op => op && op.value === '(';
-const isRBracket = op => op && op.value === ')';
-const isTStart = op => op && op.value === '?';
-const isTEnd = op => op && op.value === ':';
-// Simplified version of the Shunting yard algorithm
-const expression = (ctx, type = 'i32', inGroup = false, associativity = 'right') => {
+const valueIs = v => o => o.value === v;
+
+const isLBracket = valueIs('(');
+const isRBracket = valueIs(')');
+const isRSqrBracket = valueIs(']');
+const isLSqrBracket = valueIs('[');
+const isTStart = valueIs('?');
+const isTEnd = valueIs(':');
+const predicate = token => token.value !== ';' && token.value !== ',';
+
+// Shunting yard
+const expression = (ctx, type = 'i32', check = predicate) => {
   const operators = [];
   const operands = [];
 
-  const consume = () => operands.push(operator(ctx, { type, operator: operators.pop(), operands }));
+  const consume = () => operands.push(operator(ctx, operators.pop(), operands));
 
-  const eatUntil = predicate => {
+  const eatUntil = condition => {
     let prev = last(operators);
-    while (prev && !predicate(prev)) {
+    while (prev && !condition(prev)) {
       consume();
       prev = last(operators);
     }
   };
 
-  ctx.diAssoc = associativity;
-
-  while (ctx.token && ctx.token.value !== ';' && ctx.token.value !== ',') {
+  while (ctx.token && check(ctx.token)) {
     if (ctx.token.type === Syntax_1.Constant) operands.push(constant$1(ctx));else if (ctx.token.type === Syntax_1.Identifier) operands.push(maybeIdentifier(ctx));else if (ctx.token.type === Syntax_1.Punctuator) {
-      const op = Object.assign({
-        precedence: precedence[ctx.token.value]
-      }, ctx.token);
+      const op = _extends({}, ctx.token, {
+        precedence: precedence[ctx.token.value],
+        assoc: 'left',
+        type
+      });
 
       // Increment, decrement are a bit annoying...
       // we don't know if it's left associative or right without a lot of gymnastics
@@ -1616,21 +1746,22 @@ const expression = (ctx, type = 'i32', inGroup = false, associativity = 'right')
         op.assoc = assoc(op.value);
       }
 
-      if (isLBracket(op)) {
+      if (isLBracket(op) || isLSqrBracket(op)) {
         operators.push(op);
       } else if (isTEnd(op)) {
         eatUntil(isTStart);
       } else if (isRBracket(op)) {
-        if (!inGroup) {
-          // If we are not in a group already find the last LBracket,
-          // consume everything until that point
-          eatUntil(isLBracket);
+        // If we are not in a group already find the last LBracket,
+        // consume everything until that point
+        eatUntil(isLBracket);
 
-          // Pop left bracket
-          operators.pop();
-        } else {
-          break;
-        }
+        // Pop left bracket
+        operators.pop();
+      } else if (isRSqrBracket(op)) {
+        eatUntil(isLSqrBracket);
+        // instead of popping the square bracket (like the parens) we consume it
+        // and create a array-subscript operation
+        consume();
       } else {
         while (last(operators) && last(operators).precedence >= op.precedence && last(operators).assoc === 'left') consume();
 
@@ -1647,6 +1778,7 @@ const expression = (ctx, type = 'i32', inGroup = false, associativity = 'right')
   return operands.pop();
 };
 
+//      
 const generate = (ctx, node) => {
   if (!ctx.func) {
     node.globalIndex = ctx.Program.Globals.length;
@@ -1658,6 +1790,35 @@ const generate = (ctx, node) => {
   }
 };
 
+const arrayDeclaration = (node, ctx) => {
+  ctx.expect([']']);
+  ctx.expect(['=']);
+
+  importMemory(ctx);
+
+  if (ctx.eat(['new'], Syntax_1.Keyword)) {
+    const init = ctx.startNode();
+    ctx.expect(['Array']);
+    ctx.expect(['(']);
+    node.size = parseInt(ctx.expect(null, Syntax_1.Constant).value);
+    ctx.expect([')']);
+
+    init.id = 'new';
+    init.arguments = [{
+      value: 14,
+      Type: Syntax_1.Constant,
+      type: 'i32'
+    }];
+    init.functionIndex = 0;
+
+    node.init = ctx.endNode(init, Syntax_1.FunctionCall);
+  }
+
+  generate(ctx, node);
+
+  return ctx.endNode(node, Syntax_1.ArrayDeclaration);
+};
+
 const declaration = ctx => {
   const node = ctx.startNode();
   node.const = ctx.token.value === 'const';
@@ -1667,6 +1828,9 @@ const declaration = ctx => {
   ctx.expect([':']);
 
   node.type = ctx.expect(null, Syntax_1.Type).value;
+  if (ctx.eat(['['])) {
+    return arrayDeclaration(node, ctx);
+  }
 
   if (ctx.eat(['='])) node.init = expression(ctx, node.type);
 
@@ -1735,7 +1899,7 @@ const maybeFunctionDeclaration = ctx => {
     ctx.Program.Types.push(generateType(node));
   }
   // attach to a type index
-  node.functionIndex = ctx.Program.Functions.length;
+  node.functionIndex = ctx.Program.Functions.length + 1;
   ctx.Program.Functions.push(node.typeIndex);
   ctx.functions.push(node);
 
@@ -1902,7 +2066,7 @@ const paramList$1 = ctx => {
   const params = [];
   let node = null;
   while (ctx.token.value && ctx.token.value !== ')') {
-    node = expression(ctx, 'i32', true);
+    node = expression(ctx, 'i32', token => predicate(token) && token.value !== ')');
     if (node) {
       params.push(node);
       ctx.eat([';']);
@@ -1938,7 +2102,7 @@ const whileLoop = ctx => {
   ctx.eat(['while']);
   ctx.expect(['(']);
 
-  node.params = [null, expression(ctx, 'i32', true)];
+  node.params = [null, expression(ctx, 'i32', token => predicate(token) && token.value !== ')')];
 
   ctx.expect([')']);
   ctx.expect(['{']);
@@ -1978,7 +2142,7 @@ const ifThenElse = ctx => {
 
   // First operand is the expression
   ctx.expect(['(']);
-  node.expr = expression(ctx, 'i32', true);
+  node.expr = expression(ctx, 'i32', token => predicate(token) && token.value !== ')');
   ctx.expect([')']);
 
   // maybe a curly brace or not
@@ -2035,28 +2199,56 @@ const keyword$1 = ctx => {
   }
 };
 
+//      
+// Maybe this should be a modified ArraySubscript?
+const memoryStore = ctx => {
+  const node = expression(ctx, 'i32',
+  // quit at '='
+  token => predicate(token) && token.value !== '=');
+
+  ctx.expect(['=']);
+
+  const rhs = expression(ctx);
+
+  // NOTE:
+  // Left hand side is an expression resolving to a memory address and must
+  // be pused to the stack last for correct IR to be generated
+  node.params.push(rhs);
+
+  node.meta = ['Store'];
+
+  return ctx.endNode(node, Syntax_1.ArraySubscript);
+};
+
 // It is easier to parse assignment this way as we need to maintain a valid type
 // through out the right-hand side of the expression
 function maybeAssignment(ctx) {
+  const nextValue = ctx.stream.peek().value;
+  if (nextValue === '[') return memoryStore(ctx);
+
   const target = maybeIdentifier(ctx);
   if (target.Type === Syntax_1.FunctionCall) return target;
 
-  const nextValue = ctx.stream.peek().value;
+  const params = [];
+
   const operator = nextValue === '=' || nextValue === '--' || nextValue === '++';
+
   if (operator) {
     if (nextValue === '=') {
       ctx.eat(null, Syntax_1.Identifier);
       ctx.eat(['=']);
     }
-    const assignment = ctx.startNode();
-    assignment.operator = { value: '=' };
+    const node = ctx.startNode();
     // Push the reference to the local/global
-    assignment.operands = [target];
+    params.push(target);
     const expr = expression(ctx);
     // not a postfix
     expr.isPostfix = false;
-    assignment.operands.push(expr);
-    return ctx.endNode(assignment, Syntax_1.Assignment);
+    params.push(expr);
+
+    node.params = params;
+
+    return ctx.endNode(node, Syntax_1.Assignment);
   }
 
   return expression(ctx);
@@ -2318,6 +2510,13 @@ const emit$1 = entries => {
           payload.push(varuint32, 0, 'iniital table size');
           break;
         }
+      case EXTERN_MEMORY:
+        {
+          payload.push(index_9, kind, 'Memory');
+          payload.push(varint1, 0, 'has no max');
+          payload.push(varuint32, 1, 'iniital memory size(PAGES)');
+          break;
+        }
     }
   });
 
@@ -2438,7 +2637,9 @@ const emitLocal = (stream, local) => {
 
 const emitFunctionBody = (stream, { locals, code }) => {
   // write bytecode into a clean buffer
+  debugger;
   const body = new OutputStream();
+
   code.forEach(({ kind, params, valueType }) => {
     // There is a much nicer way of doing this
     body.push(index_9, kind.code, kind.text);
@@ -2539,6 +2740,7 @@ const getIR = source => {
 // Compiles a raw binary wasm buffer
 const compile = source => {
   const wasm = getIR(source);
+  console.log(wasm.debug());
   return wasm.buffer();
 };
 

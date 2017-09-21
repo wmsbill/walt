@@ -1,4 +1,5 @@
 const Syntax = {
+  // Syntax Nodes
   Keyword: 'Keyword',
   Export: 'Export',
   Import: 'Import',
@@ -25,7 +26,10 @@ const Syntax = {
   Assignment: 'Assignment',
   Param: 'Param',
   Typedef: 'Typedef',
-  ReturnStatement: 'ReturnStatement'
+  ReturnStatement: 'ReturnStatement',
+
+  // Semantic Nodes
+  FunctionIndex: 'FunctionIndex',
 }
 
 module.exports = Syntax;

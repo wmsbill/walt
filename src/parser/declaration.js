@@ -31,12 +31,19 @@ const arrayDeclaration = (node: Node, ctx: Context): Node => {
     ctx.expect([')']);
 
     init.id = 'new';
-    init.arguments = [{
-      value: 14,
-      Type: Syntax.Constant,
-      type: 'i32'
-    }];
-    init.functionIndex = 0;
+    init.params = [
+      ctx.makeNode({
+        params: [],
+        meta: [],
+        range: [],
+        value: 20, // ((node.size : any) : number) * 4,
+        type: 'i32'
+      }, Syntax.Constant)
+    ];
+
+    init.meta = [{
+      functionIndex: ctx.functionImports.findIndex(({ id }) => id === 'new')
+    }]
 
     node.init = ctx.endNode(init, Syntax.FunctionCall);
   }

@@ -48,7 +48,7 @@ export const generateExport = decl => {
   }
 
   if (decl && decl.func) {
-    _export.index = decl.functionIndex;
+    _export.index = 1; // decl.functionIndex;
     _export.kind = EXTERN_FUNCTION;
     _export.field = decl.id;
   }
@@ -137,7 +137,6 @@ export const generateDeclaration = (node, parent) => {
 
 export const generateArrayDeclaration = (node, parent) => {
   const block = [];
-  debugger;
   if (node.init) {
     block.push.apply(block, generateExpression(node.init));
     block.push({ kind: opcode.SetLocal, params: [node.localIndex] });
@@ -157,11 +156,15 @@ export const generateArraySubscript = (node, parent) => {
   const addressBlock = generateBinaryExpression(addNode, parent);
 
   // now we generate the value block if any
-  const block = node.params.slice(2)
-    .map(mapSyntax(parent))
-    .reduce(mergeBlock, []);
-
-  block.push.apply(block, addressBlock);
+  const block = [
+    ...addressBlock,
+    { kind: opcode.i32Const, params: [4] },
+    { kind: opcode.i32Mul, params: [] }
+    ].concat([
+      ...(node.params.slice(2)
+        .map(mapSyntax(parent))
+        .reduce(mergeBlock, []))
+    ]);
 
   const setOrLoad = node.meta[0] || 'Load';
 
@@ -240,12 +243,13 @@ export const generateAssignment = (node, parent) => {
 };
 
 const generateFunctionCall = (node, parent) => {
-  const block = node.arguments.map(mapSyntax(parent))
+  debugger;
+  const block = node.params.map(mapSyntax(parent))
     .reduce(mergeBlock, []);
 
   block.push({
     kind: opcode.Call,
-    params: [node.functionIndex]
+    params: [node.meta[0].functionIndex]
   });
 
   return block;

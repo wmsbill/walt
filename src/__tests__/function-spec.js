@@ -26,6 +26,27 @@ test('function params', t =>
   .then(outputIs(t, 4))
 );
 
+test('function scope', t =>
+  compileAndRun(`
+  const x: i32 = 32;
+  export function test(): i32 {
+    let x: i32 = 42;
+    return x;
+  }`)
+  .then(outputIs(t, 42))
+);
+
+test('undefined function vars', t =>
+  t.throws(() => {
+    compileAndRun(`
+    const x: i32 = 99;
+    export function test(): i32 {
+      let x: i32 = 42;
+      return y;
+    }`);
+  })
+);
+
 test('function pointers', t => {
   const table = new WebAssembly.Table({ element: 'anyfunc', initial: 10 });
   return compileAndRun(`

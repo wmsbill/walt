@@ -42,6 +42,8 @@ const maybeIdentifier = (ctx: Context): Node => {
     node.globalIndex = globalIndex;
     node.target = ctx.globals[node.globalIndex];
     node.type = node.target.type;
+  } else {
+    throw ctx.syntaxError(`Undefined variable name ${ctx.token.value}`);
   }
 
   ctx.diAssoc = 'left';

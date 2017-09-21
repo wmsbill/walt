@@ -10,6 +10,7 @@ import {
   generateImport,
   generateElement
 } from './generator';
+import Syntax from '../Syntax';
 
 const memoryImport = generateImport({
   module: 'env',
@@ -52,12 +53,16 @@ export const importMemory = (ctx: Context): void => {
       memoryImport
     );
 
-    const newNode = {
+    const newNode = ctx.makeNode({
       id: 'new',
       params: [{ type: 'i32', isParam: true }],
       result: 'i32',
-      typeIndex: 1 // ctx.Program.Types.length
-    };
+      // ctx.Program.Types.length
+      typeIndex: 1,
+      meta: [{
+        functionIndex: ctx.functionImports.length
+      }]
+    }, Syntax.FunctionDeclaration);
 
     ctx.Program.Types.push(generateType(newNode));
     ctx.Program.Imports.push.apply(
@@ -72,6 +77,7 @@ export const importMemory = (ctx: Context): void => {
       })
     );
     ctx.Program.Functions.push(null);
+    ctx.functionImports.push(newNode);
   }
 }
 
