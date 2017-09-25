@@ -1,23 +1,27 @@
 // @flow
-import Syntax from '../Syntax';
-import Context from './context';
-import expression, { predicate } from './expression';
+import Syntax from "../Syntax";
+import Context from "./context";
+import expression, { predicate } from "./expression";
 
 const argumentList = (ctx: Context, type: string): Node[] => {
   const list: Node[] = [];
   // return [];
-  ctx.expect(['(']);
-  while(ctx.token.value !== ')')
-    list.push(argument(ctx, type));
-  // ctx.expect([')']);
+  ctx.expect(["("]);
+  while (ctx.token.value !== ")") list.push(argument(ctx, type));
+  ctx.expect([")"]);
+
   return list;
-}
+};
 
 const argument = (ctx, type: string): Node => {
-  const node = expression(ctx, type, token => predicate(token) && token.value !== ')');
-  ctx.eat([',']);
+  const node = expression(
+    ctx,
+    type,
+    token => predicate(token) && token.value !== ")"
+  );
+  ctx.eat([","]);
   return node;
-}
+};
 const functionCall = (ctx: Context) => {
   const node = ctx.startNode();
   node.id = ctx.expect(null, Syntax.Identifier).value;
@@ -25,33 +29,38 @@ const functionCall = (ctx: Context) => {
   const maybePointer = ctx.func.locals.find(l => l.id === node.id);
   const localIndex = ctx.func.locals.findIndex(({ id }) => id === node.id);
 
-  let Type = Syntax.FunctionCall
+  let Type = Syntax.FunctionCall;
 
   if (maybePointer && localIndex > -1) {
     Type = Syntax.IndirectFunctionCall;
 
-    node.params = [
-      ctx.endNode({
-        range: [],
-        localIndex,
-        target: ctx.func.locals[localIndex],
-        type: ctx.func.locals[localIndex].type
-      }, Syntax.Identifier)
-    ];
+    node.params.push(
+      ctx.endNode(
+        {
+          range: [],
+          localIndex,
+          target: ctx.func.locals[localIndex],
+          type: ctx.func.locals[localIndex].type
+        },
+        Syntax.Identifier
+      )
+    );
   } else {
+    debugger;
     const func = ctx.functions.find(({ id }) => id == node.id);
-    if (!func)
-      throw ctx.syntaxError(`Undefined function: ${node.id}`);
+    if (!func) throw ctx.syntaxError(`Undefined function: ${node.id}`);
 
     node.meta.push({ ...func.meta[0] });
   }
 
   const proto = ctx.functions[node.functionIndex];
 
-  node.params = argumentList(ctx, (proto && proto.type) || 'i32');
+  node.params.push.apply(
+    node.params,
+    argumentList(ctx, (proto && proto.type) || "i32")
+  );
 
   return ctx.endNode(node, Type);
-}
+};
 
 export default functionCall;
-

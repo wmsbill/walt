@@ -1,41 +1,43 @@
-import { EXTERN_GLOBAL, EXTERN_FUNCTION } from '../emitter/external_kind';
-import { I32, I64, F32, F64 } from '../emitter/value_type';
-import opcode, { opcodeFromOperator } from '../emitter/opcode';
-import Syntax from '../Syntax';
-import curry from 'curry';
+import { EXTERN_GLOBAL, EXTERN_FUNCTION } from "../emitter/external_kind";
+import { I32, I64, F32, F64 } from "../emitter/value_type";
+import opcode, { opcodeFromOperator } from "../emitter/opcode";
+import Syntax from "../Syntax";
+import curry from "curry";
+import { get, FUNCTION_INDEX } from "./metadata";
 
 // clean this up
 export const getType = str => {
-  switch(str) {
-    case 'f32': return F32;
-    case 'f64': return F64;
-    case 'i32':
-    case 'Function':
-    default: return I32;
+  switch (str) {
+    case "f32":
+      return F32;
+    case "f64":
+      return F64;
+    case "i32":
+    case "Function":
+    default:
+      return I32;
   }
 };
 
-const isLocal = node => ('localIndex' in node);
+const isLocal = node => "localIndex" in node;
 const scopeOperation = curry((op, node) => {
   const index = isLocal(node) ? node.localIndex : node.globalIndex;
-  const kind = isLocal(node) ? op + 'Local' : op + 'Global';
+  const kind = isLocal(node) ? op + "Local" : op + "Global";
   return { kind: opcode[kind], params: [index] };
 });
 
 const getConstOpcode = node => ({
-  kind: opcode[node.type + 'Const'] || opcode.i32Const,
+  kind: opcode[node.type + "Const"] || opcode.i32Const,
   params: [node.value]
 });
 
-const setInScope = scopeOperation('Set');
-const getInScope = scopeOperation('Get');
+const setInScope = scopeOperation("Set");
+const getInScope = scopeOperation("Get");
 const mergeBlock = (block, v) => {
   // some node types are a sequence of opcodes:
   // nested expressions for example
-  if (Array.isArray(v))
-    block = [...block, ...v];
-  else
-    block.push(v);
+  if (Array.isArray(v)) block = [...block, ...v];
+  else block.push(v);
   return block;
 };
 
@@ -48,7 +50,7 @@ export const generateExport = decl => {
   }
 
   if (decl && decl.func) {
-    _export.index = 1; // decl.functionIndex;
+    _export.index = decl.functionIndex;
     _export.kind = EXTERN_FUNCTION;
     _export.field = decl.id;
   }
@@ -68,7 +70,7 @@ export const generateImport = node => {
       typeIndex
     };
   });
-}
+};
 
 export const generateValueType = node => {
   const value = {
@@ -83,7 +85,7 @@ export const generateInit = node => {
 
   const { Type, value } = node.init;
   if (Type === Syntax.Constant) {
-    switch(_global.type) {
+    switch (_global.type) {
       case F32:
       case F64:
         _global.init = parseFloat(value);
@@ -100,7 +102,7 @@ export const generateInit = node => {
 
 export const generateType = node => {
   const type = { params: [], result: null };
-  if (node.result && node.result !== 'void') {
+  if (node.result && node.result !== "void") {
     type.result = getType(node.result);
   }
 
@@ -108,7 +110,7 @@ export const generateType = node => {
   type.id = node.id;
 
   return type;
-}
+};
 
 export const generateReturn = node => {
   const parent = { postfix: [] };
@@ -143,7 +145,7 @@ export const generateArrayDeclaration = (node, parent) => {
   }
   parent.locals.push(generateValueType(node));
   return block;
-}
+};
 
 export const generateArraySubscript = (node, parent) => {
   // We need to create a copy of the node and generate a binary addition.
@@ -152,21 +154,25 @@ export const generateArraySubscript = (node, parent) => {
   //
   // Where param[0] is an Idetntifier and param[1] is the expression inside of
   // the square brackets.
-  const addNode = { ...node, params: node.params.slice(0, 2), value: '+' };
+  const addNode = { ...node, params: node.params.slice(0, 2), value: "+" };
   const addressBlock = generateBinaryExpression(addNode, parent);
 
   // now we generate the value block if any
   const block = [
     ...addressBlock,
-    { kind: opcode.i32Const, params: [4] },
+    { kind: opcode.i32Const, param: [4] },
     { kind: opcode.i32Mul, params: [] }
-    ].concat([
-      ...(node.params.slice(2)
-        .map(mapSyntax(parent))
-        .reduce(mergeBlock, []))
-    ]);
+  ];
 
-  const setOrLoad = node.meta[0] || 'Load';
+  block.push.apply(
+    block,
+    node.params
+      .slice(2)
+      .map(mapSyntax(parent))
+      .reduce(mergeBlock, [])
+  );
+
+  const setOrLoad = node.meta[0] || "Load";
 
   // THe last piece is the WASM opcode. Either load or store
   block.push({
@@ -181,16 +187,14 @@ export const generateArraySubscript = (node, parent) => {
   });
 
   return block;
-}
+};
 
 /**
  * Transform a binary expression node into a list of opcodes
  */
 export const generateBinaryExpression = (node, parent) => {
   // Map operands first
-  const block = node.params
-    .map(mapSyntax(parent))
-    .reduce(mergeBlock, []);
+  const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 
   // Increment and decrement make this less clean:
   // If either increment or decrement then:
@@ -200,7 +204,10 @@ export const generateBinaryExpression = (node, parent) => {
   if (node.isPostfix && parent) {
     parent.postfix.push(block);
     // Simply return the left-hand
-    return node.params.slice(0, 1).map(mapSyntax(parent)).reduce(mergeBlock, []);
+    return node.params
+      .slice(0, 1)
+      .map(mapSyntax(parent))
+      .reduce(mergeBlock, []);
   }
 
   // Map the operator last
@@ -213,7 +220,8 @@ export const generateBinaryExpression = (node, parent) => {
 
 export const generateTernary = (node, parent) => {
   const mapper = mapSyntax(parent);
-  const block = node.params.slice(0, 1)
+  const block = node.params
+    .slice(0, 1)
     .map(mapper)
     .reduce(mergeBlock, []);
 
@@ -221,19 +229,32 @@ export const generateTernary = (node, parent) => {
     kind: opcodeFromOperator(node),
     valueType: generateValueType(node)
   });
-  block.push.apply(block, node.params.slice(1, 2).map(mapper).reduce(mergeBlock, []));
+  block.push.apply(
+    block,
+    node.params
+      .slice(1, 2)
+      .map(mapper)
+      .reduce(mergeBlock, [])
+  );
   block.push({
-    kind: opcodeFromOperator({ value: ':' })
+    kind: opcodeFromOperator({ value: ":" })
   });
-  block.push.apply(block, node.params.slice(-1).map(mapper).reduce(mergeBlock, []));
+  block.push.apply(
+    block,
+    node.params
+      .slice(-1)
+      .map(mapper)
+      .reduce(mergeBlock, [])
+  );
   block.push({ kind: opcode.End });
 
   return block;
-}
+};
 
 export const generateAssignment = (node, parent) => {
   const subParent = { postfix: [] };
-  const block = node.params.slice(1)
+  const block = node.params
+    .slice(1)
     .map(mapSyntax(subParent))
     .reduce(mergeBlock, []);
 
@@ -244,22 +265,19 @@ export const generateAssignment = (node, parent) => {
 
 const generateFunctionCall = (node, parent) => {
   debugger;
-  const block = node.params.map(mapSyntax(parent))
-    .reduce(mergeBlock, []);
+  const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 
   block.push({
     kind: opcode.Call,
-    params: [node.meta[0].functionIndex]
+    params: [get(FUNCTION_INDEX, node).payload.functionIndex]
   });
 
   return block;
-}
+};
 
 const generateIndirectFunctionCall = (node, parent) => {
-  const block = node.arguments
-    .concat(node.params)
-    .map(mapSyntax(parent))
-    .reduce(mergeBlock, []);
+  debugger;
+  const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 
   block.push({
     kind: opcode.CallIndirect,
@@ -267,7 +285,7 @@ const generateIndirectFunctionCall = (node, parent) => {
   });
 
   return block;
-}
+};
 
 // probably should be called "generateBranch" and be more generic
 // like handling ternary for example. A lot of shared logic here & ternary
@@ -294,18 +312,18 @@ const generateIf = (node, parent) => {
 
   block.push({ kind: opcode.End });
   return block;
-}
+};
 
 export const generateLoop = (node, parent) => {
   const block = [];
   const mapper = mapSyntax(parent);
   const reverse = {
-    '>': '<',
-    '<': '>',
-    '>=': '<=',
-    '<=': '>=',
-    '==': '!=',
-    '!=': '=='
+    ">": "<",
+    "<": ">",
+    ">=": "<=",
+    "<=": ">=",
+    "==": "!=",
+    "!=": "=="
   };
 
   const condition = node.params.slice(1, 2);
@@ -327,7 +345,7 @@ export const generateLoop = (node, parent) => {
   block.push({ kind: opcode.End });
 
   return block;
-}
+};
 
 const syntaxMap = {
   [Syntax.FunctionCall]: generateFunctionCall,
@@ -353,7 +371,10 @@ const syntaxMap = {
 export const mapSyntax = curry((parent, operand) => {
   const mapping = syntaxMap[operand.Type];
   if (!mapping) {
-    const value = (operand.id || operand.value) || (operand.operator && operand.operator.value);
+    const value =
+      operand.id ||
+      operand.value ||
+      (operand.operator && operand.operator.value);
     throw new Error(`Unexpected Syntax Token ${operand.Type} : ${value}`);
   }
   return mapping(operand, parent);
@@ -362,11 +383,11 @@ export const mapSyntax = curry((parent, operand) => {
 export const generateExpression = (node, parent) => {
   const block = [node].map(mapSyntax(parent)).reduce(mergeBlock, []);
   return block;
-}
+};
 
-export const generateElement = (functionIndex) => {
+export const generateElement = functionIndex => {
   return { functionIndex };
-}
+};
 
 export const generateCode = func => {
   const block = {
@@ -380,4 +401,3 @@ export const generateCode = func => {
 
   return block;
 };
-

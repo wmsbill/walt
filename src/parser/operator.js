@@ -1,68 +1,102 @@
 // @flow
-import Syntax from '../Syntax';
-import Context from './context';
-import type { OperatorToken, Node } from '../flow/types';
+import Syntax from "../Syntax";
+import Context from "./context";
+import metadata from "./metadata";
+import functionCall from "./function-call";
+import { getAssociativty } from "./precedence";
+import type { Token, Node } from "../flow/types";
 
-function binary(ctx: Context, operator: OperatorToken, params: Node[]) {
+function binary(ctx: Context, op: Token, params: Node[]) {
   const node = ctx.startNode(params[0]);
-  node.value = operator.value;
+  node.value = op.value;
   node.params = params;
-  node.type = operator.type;
-  node.isPostfix = operator.isPostfix;
+  // FIXME: type of the binary expression should be more accurate
+  node.type = params[0].type || "i32";
 
-  ctx.diAssoc = 'left';
+  ctx.diAssoc = "left";
   let Type = Syntax.BinaryExpression;
-  if (node.value === '=') {
+  if (node.value === "=") {
     Type = Syntax.Assignment;
-    ctx.diAssoc = 'right';
-  } else if (node.value === '[') {
+    ctx.diAssoc = "right";
+  } else if (node.value === "[") {
     Type = Syntax.ArraySubscript;
+  } else if (node.type === Syntax.FunctionCall) {
+    return functionCall(ctx, node);
   }
 
   return ctx.endNode(node, Type);
 }
 
-function unary(ctx: Context, operator: OperatorToken, params: Node[]) {
+function unary(ctx: Context, op: Token, params: Node[]) {
   // Since WebAssembly has no 'native' support for incr/decr _opcode_ it's much simpler to
   // convert this unary to a binary expression by throwing in an extra operand of 1
-  if (operator.value === '--' || operator.value === '++') {
-    // set isPostfix to help the IR generator
-    // TODO: abstract this to the generator?
+  if (op.value === "--" || op.value === "++") {
     const newParams = [...params];
-    const newOperator = {...operator};
-    newOperator.value = operator.value[0];
-    newOperator.isPostfix = operator.assoc === 'left';
-    newParams.push({ Type: Syntax.Constant, value: '1' });
+    const newOperator = { ...op };
+    newOperator.meta.push(metadata.postfix(true));
+    newOperator.value = op.value[0];
+    newOperator.isPostfix = getAssociativty(op) === "left";
+    newParams.push(
+      ctx.makeNode(
+        {
+          value: "1"
+        },
+        Syntax.Constant
+      )
+    );
     return binary(ctx, newOperator, newParams);
   }
   const node = ctx.startNode(params[0]);
   node.params = params;
-  node.value = operator.value;
+  node.value = op.value;
 
   return ctx.endNode(node, Syntax.UnaryExpression);
 }
 
-const ternary = (ctx: Context, operator: OperatorToken, params: Node[]) => {
+const ternary = (ctx: Context, op: Token, params: Node[]) => {
   const node = ctx.startNode(params[0]);
   node.params = params;
-  node.value = operator.value;
-  node.type = operator.type;
+  node.value = op.value;
+  node.type = op.type;
 
   return ctx.endNode(node, Syntax.TernaryExpression);
 };
 
+const flattenSequence = (sequence: Node[]): Node[] => {
+  return sequence.reduce((memo, node) => {
+    if (node.Type === Syntax.Sequence) {
+      memo.push.apply(memo, flattenSequence(node.params));
+    } else {
+      memo.push(node);
+    }
+
+    return memo;
+  }, []);
+};
+
+// Sequence is a list of comma separated nodes. It's a slighlty special operator
+// in that it unrolls any other sequences into it's own params
+const sequence = (ctx: Context, op: Token, params: Node[]) => {
+  const node = ctx.startNode(params[0]);
+  node.value = op.value;
+  node.params = flattenSequence(params);
+  node.type = op.type;
+  return ctx.endNode(node, Syntax.Sequence);
+};
+
 // Abstraction for handling operations
-const operator = (ctx: Context, operator: OperatorToken, operands: Node[]) => {
-  switch(operator.value) {
-    case '++':
-    case '--':
-      return unary(ctx, operator, operands.splice(-1));
-    case '?':
-      return ternary(ctx, operator, operands.splice(-3));
+const operator = (ctx: Context, op: Token, operands: Node[]) => {
+  switch (op.value) {
+    case "++":
+    case "--":
+      return unary(ctx, op, operands.splice(-1));
+    case "?":
+      return ternary(ctx, op, operands.splice(-3));
+    case ",":
+      return sequence(ctx, op, operands.slice(-2));
     default:
-      return binary(ctx, operator, operands.splice(-2));
+      return binary(ctx, op, operands.splice(-2));
   }
 };
 
 export default operator;
-

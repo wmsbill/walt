@@ -36,7 +36,7 @@ const arrayDeclaration = (node: Node, ctx: Context): Node => {
         params: [],
         meta: [],
         range: [],
-        value: 20, // ((node.size : any) : number) * 4,
+        value: ((node.size : any) : number) * 4,
         type: 'i32'
       }, Syntax.Constant)
     ];

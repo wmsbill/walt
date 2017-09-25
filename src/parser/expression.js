@@ -1,127 +1,129 @@
 // @flow
-import Syntax from '../Syntax';
-import Context from './context';
-import operator from './operator';
-import constant from './constant';
-import precedence from './precedence';
-import maybeIdentifier from './maybe-identifier';
-import type { Node, Token, OperatorToken } from '../flow/types';
+import Syntax from "../Syntax";
+import Context from "./context";
+import operator from "./operator";
+import constant from "./constant";
+import { getAssociativty, getPrecedence } from "./introspection";
+import maybeIdentifier from "./maybe-identifier";
+import type { Node, Token } from "../flow/types";
 
-export type Predicate = (Token) => boolean;
-export type OperatorCheck = (OperatorToken) => boolean;
+export type Predicate = (Token, number) => boolean;
+export type OperatorCheck = Token => boolean;
 
-const last = list => list[list.length - 1];
+const last = (list: any[]): any => list[list.length - 1];
 
-const assoc = op => {
-  switch(op) {
-    case '+':
-    case '-':
-    case '/':
-    case '*':
-    case ':':
-      return 'left';
-    case '=':
-    case '--':
-    case '++':
-    case '?':
-      return 'right';
-    default:
-      return 'left';
-  }
-};
+const valueIs = (v: string) => (o: Token): boolean => o.value === v;
 
-const valueIs = (v: string) => (o: OperatorToken): boolean => o.value === v;
+const isLBracket = valueIs("(");
+const isRBracket = valueIs(")");
+const isRSqrBracket = valueIs("]");
+const isLSqrBracket = valueIs("[");
+const isTStart = valueIs("?");
+const isTEnd = valueIs(":");
 
-const isLBracket = valueIs('(');
-const isRBracket = valueIs(')');
-const isRSqrBracket = valueIs(']');
-const isLSqrBracket = valueIs('[');
-const isTStart = valueIs('?');
-const isTEnd = valueIs(':');
-const hasLBracket = ops => ops.find(isLBracket);
-
-export const predicate = (token: Token): boolean =>
-  token.value !== ';' && token.value !== ',';
+export const predicate = (token: Token, depth: number): boolean =>
+  token.value !== ";" && depth > 0;
 
 // Shunting yard
 const expression = (
   ctx: Context,
-  type: string = 'i32',
+  type: string = "i32",
   check: Predicate = predicate
 ) => {
   const operators: Token[] = [];
   const operands: Node[] = [];
+  // Depth is the nesting level of brackets in this expression. If we find a
+  // closing bracket which causes our depth to fall below 1, then we know we
+  // should exit the expression.
+  let depth: number = 1;
+  let eatFunctionCall = false;
 
-  const consume = () =>
-    operands.push(operator(ctx, operators.pop(), operands));
+  const consume = () => operands.push(operator(ctx, operators.pop(), operands));
 
-  const eatUntil = (condition) => {
+  const eatUntil = condition => {
     let prev = last(operators);
-    while(prev && !condition(prev)) {
+    while (prev && !condition(prev)) {
       consume();
       prev = last(operators);
     }
   };
 
-  while(ctx.token && check(ctx.token)) {
-    if (ctx.token.type === Syntax.Constant)
+  debugger;
+  while (ctx.token && check(ctx.token, depth)) {
+    if (ctx.token.type === Syntax.Constant) {
+      eatFunctionCall = false;
       operands.push(constant(ctx));
-    else if (ctx.token.type === Syntax.Identifier)
+    } else if (ctx.token.type === Syntax.Identifier) {
+      eatFunctionCall = true;
       operands.push(maybeIdentifier(ctx));
-    else if (ctx.token.type === Syntax.Punctuator) {
-      const op: OperatorToken = {
-        ...ctx.token,
-        precedence: precedence[ctx.token.value],
-        assoc: 'left',
-        type
-      };
+    } else if (ctx.token.type === Syntax.Punctuator) {
+      switch (ctx.token.value) {
+        case "(":
+          // Function call.
+          if (eatFunctionCall) {
+            // Tokenizer does not generate function call tokens it is our job here
+            // to generate a function call on the fly
+            operators.push({
+              ...ctx.token,
+              type: Syntax.FunctionCall
+            });
+            operands.push(expression(ctx));
+          } else {
+            operators.push(ctx.token);
+          }
+          depth++;
+          break;
+        case "[":
+          operators.push(ctx.token);
+          break;
+        case "]":
+          eatUntil(isLSqrBracket);
+          consume();
+          break;
+        case ":":
+          eatUntil(isTStart);
+          break;
+        case ")": {
+          // If we are not in a group already find the last LBracket,
+          // consume everything until that point
+          eatUntil(isLBracket);
+          const previous = last(operators);
+          if (previous && previous.type === Syntax.FunctionCall) consume();
+          else
+            // Pop left bracket
+            operators.pop();
 
-      // Increment, decrement are a bit annoying...
-      // we don't know if it's left associative or right without a lot of gymnastics
-      if (ctx.token.value === '--' || ctx.token.value === '++') {
-        // As we create different nodes the diAssoc is changed
-        op.assoc = ctx.diAssoc;
-      } else {
-        // vanilla binary operator
-        op.assoc = assoc(op.value);
+          depth--;
+          break;
+        }
+        default: {
+          let previous;
+          while (
+            (previous = last(operators)) &&
+            previous.Type !== Syntax.Sequence &&
+            getPrecedence(previous) >= getPrecedence(ctx.token) &&
+            getAssociativty(previous) === "left"
+          ) {
+            if (
+              ctx.token.value === "," &&
+              previous.type === Syntax.FunctionCall
+            )
+              break;
+            consume();
+          }
+          operators.push(ctx.token);
+        }
       }
-
-      if (isLBracket(op) || isLSqrBracket(op)) {
-        operators.push(op);
-      } else if (isTEnd(op)) {
-        eatUntil(isTStart);
-      } else if (isRBracket(op)) {
-        // If we are not in a group already find the last LBracket,
-        // consume everything until that point
-        eatUntil(isLBracket);
-
-        // Pop left bracket
-        operators.pop();
-      } else if (isRSqrBracket(op)) {
-        eatUntil(isLSqrBracket);
-        // instead of popping the square bracket (like the parens) we consume it
-        // and create a array-subscript operation
-        consume();
-      } else {
-        while(last(operators)
-          && last(operators).precedence >= op.precedence
-          && last(operators).assoc === 'left'
-        ) consume();
-
-        operators.push(op);
-      }
+      eatFunctionCall = false;
     }
 
     ctx.next();
-  };
+  }
 
-
-  while(operators.length)
-    consume();
+  while (operators.length) consume();
 
   // Should be a node
   return operands.pop();
-}
+};
 
 export default expression;
-

@@ -11,15 +11,15 @@ export type Token = {
   end: Marker,
   type: string,
   value: string
-}
+};
 
-export type OperatorToken =
-  Token
-  & {
-    precedence: number,
-    assoc: string,
-    type: string
-  };
+export type OperatorToken = Token & {
+  precedence: number,
+  assoc: string,
+  type: string
+};
+
+export type Metadata = { type: string, payload: any };
 
 // Nodes
 export type Typed = { id?: string, type: string };
@@ -31,7 +31,7 @@ export type Node = {
   value: string,
   size?: number,
   result?: Typed | null,
-  meta: any[],
+  meta: Metadata[],
   params: Node[],
   body?: Node[]
 };
@@ -43,10 +43,8 @@ export type Field = {
   functionIndex?: number
 };
 
-export type Import =
-  {
-    fields: Field[],
-    module: string
-  }
-  & Node;
+export type Import = {
+  fields: Field[],
+  module: string
+} & Node;
 
