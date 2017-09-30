@@ -287,7 +287,6 @@ const generateIndirectFunctionCall = (node, parent) => {
 };
 
 const generateFunctionPointer = node => {
-  debugger;
   return {
     kind: opcode.i32Const,
     params: [get(FUNCTION_INDEX, node).payload.functionIndex]

@@ -55,7 +55,7 @@ const ternary = (ctx: Context, op: Token, params: Node[]) => {
   const node = ctx.startNode(params[0]);
   node.params = params;
   node.value = op.value;
-  node.type = op.type;
+  node.type = params[params.length - 1].type;
 
   return ctx.endNode(node, Syntax.TernaryExpression);
 };

@@ -12,7 +12,7 @@ export const make = (payload: any, type: string) => ({
 });
 
 export const get = (type: string, node: Node): ?Metadata => {
-  return node.meta.find(({ type }) => type === type) || null;
+  return node.meta.find(({ type: _type }) => _type === type) || null;
 };
 
 export const funcIndex = (payload: any): Metadata => ({

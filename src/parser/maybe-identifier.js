@@ -17,6 +17,7 @@ const maybeIdentifier = (ctx: Context): Node => {
   const globalIndex = findGlobalIndex(ctx, ctx.token);
   const functionIndex = findFunctionIndex(ctx, ctx.token);
 
+  debugger;
   let Type = Syntax.Identifier;
   // Not a function call or pointer, look-up variables
   if (localIndex !== -1) {
