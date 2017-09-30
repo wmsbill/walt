@@ -286,6 +286,14 @@ const generateIndirectFunctionCall = (node, parent) => {
   return block;
 };
 
+const generateFunctionPointer = node => {
+  debugger;
+  return {
+    kind: opcode.i32Const,
+    params: [get(FUNCTION_INDEX, node).payload.functionIndex]
+  };
+};
+
 // probably should be called "generateBranch" and be more generic
 // like handling ternary for example. A lot of shared logic here & ternary
 const generateIf = (node, parent) => {
@@ -356,6 +364,7 @@ const syntaxMap = {
   [Syntax.IfThenElse]: generateIf,
   [Syntax.Identifier]: getInScope,
   [Syntax.FunctionIdentifier]: getInScope,
+  [Syntax.FunctionPointer]: generateFunctionPointer,
   [Syntax.ReturnStatement]: generateReturn,
   // Binary
   [Syntax.Declaration]: generateDeclaration,

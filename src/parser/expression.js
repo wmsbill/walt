@@ -73,6 +73,7 @@ const expression = (
     } else if (ctx.token.type === Syntax.Punctuator) {
       switch (ctx.token.value) {
         case "(":
+          depth++;
           // Function call.
           // TODO: figure out a cleaner(?) way of doing this, maybe
           if (eatFunctionCall) {
@@ -92,7 +93,6 @@ const expression = (
           } else {
             operators.push(ctx.token);
           }
-          depth++;
           break;
         case "[":
           operators.push(ctx.token);
@@ -105,16 +105,17 @@ const expression = (
           eatUntil(isTStart);
           break;
         case ")": {
+          depth--;
+          if (depth < 1) return false;
           // If we are not in a group already find the last LBracket,
           // consume everything until that point
           eatUntil(isLBracket);
           const previous = last(operators);
           if (previous && previous.type === Syntax.FunctionCall) consume();
-          else
+          else if (depth > 0)
             // Pop left bracket
             operators.pop();
 
-          depth--;
           break;
         }
         default: {

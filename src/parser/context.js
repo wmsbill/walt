@@ -1,12 +1,13 @@
 // @flow
-import { getType } from './generator';
-import TokenStream from '../utils/token-stream';
-import generateErrorString from '../utils/generate-error';
-import type { Token, Node } from '../flow/types';
+import { getType } from "./generator";
+import TokenStream from "../utils/token-stream";
+import generateErrorString from "../utils/generate-error";
+import type { Token, Node } from "../flow/types";
 
 export const findTypeIndex = (node: Node, Types: Node[]): number => {
   return Types.findIndex(t => {
-    const paramsMatch = t.params.length === node.params.length &&
+    const paramsMatch =
+      t.params.length === node.params.length &&
       t.params.reduce(
         (a, v, i) => node.params[i] && a && v === getType(node.params[i].type),
         true
@@ -18,7 +19,7 @@ export const findTypeIndex = (node: Node, Types: Node[]): number => {
 
     return paramsMatch && resultMatch;
   });
-}
+};
 
 /**
  * Context is used to parse tokens into an AST and IR used by the generator.
@@ -49,15 +50,17 @@ class Context {
   Program: any;
   lines: string[];
   functionImports: Node[];
+  functionImportsLength: number;
 
   constructor(options: ContextOptions) {
     Object.assign(this, {
       body: [],
-      diAssoc: 'right',
+      diAssoc: "right",
       globals: [],
       functions: [],
       lines: [],
       functionImports: [],
+      functionImportsLength: 0,
       ...options
     });
 
@@ -79,35 +82,37 @@ class Context {
     return new SyntaxError(
       generateErrorString(
         msg,
-        error || '',
+        error || "",
         this.token,
         this.lines[this.token.start.line - 1],
-        this.filename || 'unknown',
-        (this.func && this.func.id) || 'global'
+        this.filename || "unknown",
+        (this.func && this.func.id) || "global"
       )
     );
   }
 
   unexpectedValue(value: string[] | string) {
     return this.syntaxError(
-      `Expected: ${Array.isArray(value) ? value.join('|') : value}`,
-      'Unexpected value'
+      `Expected: ${Array.isArray(value) ? value.join("|") : value}`,
+      "Unexpected value"
     );
   }
 
   unexpected(token?: string) {
     return this.syntaxError(
-      `Expected: ${Array.isArray(token) ? token.join(' | ') : JSON.stringify(token)}`,
+      `Expected: ${Array.isArray(token)
+        ? token.join(" | ")
+        : JSON.stringify(token)}`,
       `Unexpected token ${this.token.type}`
     );
   }
 
   unknown({ value }: { value: string }) {
-    return this.syntaxError('Unknown token', value);
+    return this.syntaxError("Unknown token", value);
   }
 
   unsupported() {
-    return this.syntaxError('Language feature not supported', this.token.value);
+    return this.syntaxError("Language feature not supported", this.token.value);
   }
 
   expect(value: string[] | null, type?: string): Token {
@@ -123,7 +128,7 @@ class Context {
     this.token = this.stream.next();
   }
 
-  eat(value: string[] | null, type?: string): bool {
+  eat(value: string[] | null, type?: string): boolean {
     if (value) {
       if (value.includes(this.token.value)) {
         this.next();
@@ -142,7 +147,7 @@ class Context {
 
   startNode(token: any = this.token): Node {
     return {
-      Type: '',
+      Type: "",
       value: token.value,
       range: [token.start],
       meta: [],
@@ -160,12 +165,14 @@ class Context {
   }
 
   makeNode(node: any, syntax: string): Node {
-    return this.endNode({
-      ...this.startNode(),
-      ...node
-    }, syntax);
+    return this.endNode(
+      {
+        ...this.startNode(),
+        ...node
+      },
+      syntax
+    );
   }
 }
 
 export default Context;
-

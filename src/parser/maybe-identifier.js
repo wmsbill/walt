@@ -27,12 +27,11 @@ const maybeIdentifier = (ctx: Context): Node => {
     node.meta.push(meta.globalIndex(globalIndex));
   } else if (functionIndex !== -1 && ctx.stream.peek().value !== "(") {
     node.type = "i32";
-    Type = Syntax.Constant;
-    node.value = functionIndex;
-    node.meta.push(meta.funcIndex(functionIndex));
+    Type = Syntax.FunctionPointer;
+    node.meta.push(meta.get(meta.FUNCTION_INDEX, ctx.functions[functionIndex]));
     writeFunctionPointer(ctx, functionIndex);
-  } else {
-    // throw ctx.syntaxError(`Undefined variable name ${ctx.token.value}`);
+  } else if (functionIndex == -1) {
+    throw ctx.syntaxError(`Undefined variable name ${ctx.token.value}`);
   }
 
   ctx.diAssoc = "left";
