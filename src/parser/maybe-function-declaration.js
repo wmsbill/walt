@@ -88,7 +88,7 @@ const maybeFunctionDeclaration = ctx => {
   }
 
   // Sanity check the return statement
-  const ret = last(node.body);
+  const ret = last(node.params);
   if (ret && node.type) {
     if (node.type === "void" && ret.Type === Syntax.ReturnStatement)
       throw ctx.syntaxError(

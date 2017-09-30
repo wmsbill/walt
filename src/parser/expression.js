@@ -5,6 +5,7 @@ import operator from "./operator";
 import constant from "./constant";
 import { getAssociativty, getPrecedence } from "./introspection";
 import maybeIdentifier from "./maybe-identifier";
+import { PRECEDENCE_FUNCTION_CALL } from "./precedence";
 import type { Node, Token } from "../flow/types";
 
 export type Predicate = (Token, number) => boolean;
@@ -48,8 +49,21 @@ const expression = (
     }
   };
 
+  const flushOperators = (precedence, value) => {
+    let previous = null;
+    while (
+      (previous = last(operators)) &&
+      previous.Type !== Syntax.Sequence &&
+      getPrecedence(previous) >= precedence &&
+      getAssociativty(previous) === "left"
+    ) {
+      if (value === "," && previous.type === Syntax.FunctionCall) break;
+      consume();
+    }
+  };
+
   debugger;
-  while (ctx.token && check(ctx.token, depth)) {
+  const process = () => {
     if (ctx.token.type === Syntax.Constant) {
       eatFunctionCall = false;
       operands.push(constant(ctx));
@@ -60,14 +74,21 @@ const expression = (
       switch (ctx.token.value) {
         case "(":
           // Function call.
+          // TODO: figure out a cleaner(?) way of doing this, maybe
           if (eatFunctionCall) {
+            // definetly not immutable
+            last(operands).Type = Syntax.FunctionIdentifier;
+            flushOperators(PRECEDENCE_FUNCTION_CALL);
             // Tokenizer does not generate function call tokens it is our job here
             // to generate a function call on the fly
             operators.push({
               ...ctx.token,
               type: Syntax.FunctionCall
             });
-            operands.push(expression(ctx));
+            ctx.next();
+            const expr = expression(ctx);
+            if (expr) operands.push(expr);
+            return false;
           } else {
             operators.push(ctx.token);
           }
@@ -97,27 +118,18 @@ const expression = (
           break;
         }
         default: {
-          let previous;
-          while (
-            (previous = last(operators)) &&
-            previous.Type !== Syntax.Sequence &&
-            getPrecedence(previous) >= getPrecedence(ctx.token) &&
-            getAssociativty(previous) === "left"
-          ) {
-            if (
-              ctx.token.value === "," &&
-              previous.type === Syntax.FunctionCall
-            )
-              break;
-            consume();
-          }
+          flushOperators(getPrecedence(ctx.token), ctx.token.value);
           operators.push(ctx.token);
         }
       }
       eatFunctionCall = false;
     }
 
-    ctx.next();
+    return true;
+  };
+
+  while (ctx.token && check(ctx.token, depth)) {
+    if (process()) ctx.next();
   }
 
   while (operators.length) consume();

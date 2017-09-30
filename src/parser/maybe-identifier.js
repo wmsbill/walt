@@ -1,10 +1,9 @@
 //@flow
 import Syntax from "../Syntax";
-import functionCall from "./function-call";
 import Context from "./context";
 import meta from "./metadata";
-import type { Node } from "../flow/types";
 import { writeFunctionPointer } from "./implicit-imports";
+import type { Node } from "../flow/types";
 import {
   findLocalIndex,
   findGlobalIndex,
@@ -17,29 +16,8 @@ const maybeIdentifier = (ctx: Context): Node => {
   const localIndex = findLocalIndex(ctx, ctx.token);
   const globalIndex = findGlobalIndex(ctx, ctx.token);
   const functionIndex = findFunctionIndex(ctx, ctx.token);
-  const nextToken = ctx.stream.peek();
-  const isFuncitonCall = nextToken.value === "(";
 
-  // Function pointer
-  // if (
-  //   !isFuncitonCall &&
-  //   localIndex < 0 &&
-  //   globalIndex < 0 &&
-  //   functionIndex > -1
-  // ) {
-  //   // Save the element
-  //   writeFunctionPointer(ctx, functionIndex);
-  //   // Encode a function pointer as a i32.const representing the function index
-  //   const tableIndex = ctx.Program.Element.findIndex(
-  //     e => e.functionIndex === functionIndex
-  //   );
-  //   node.value = tableIndex;
-  //   return ctx.endNode(node, Syntax.Constant);
-  // } else if (isFuncitonCall) {
-  //   // if function call then encode it as such
-  //   return functionCall(ctx);
-  // }
-
+  let Type = Syntax.Identifier;
   // Not a function call or pointer, look-up variables
   if (localIndex !== -1) {
     node.type = ctx.func.locals[localIndex].type;
@@ -47,12 +25,18 @@ const maybeIdentifier = (ctx: Context): Node => {
   } else if (globalIndex !== -1) {
     node.type = ctx.globals[globalIndex].type;
     node.meta.push(meta.globalIndex(globalIndex));
+  } else if (functionIndex !== -1 && ctx.stream.peek().value !== "(") {
+    node.type = "i32";
+    Type = Syntax.Constant;
+    node.value = functionIndex;
+    node.meta.push(meta.funcIndex(functionIndex));
+    writeFunctionPointer(ctx, functionIndex);
   } else {
     // throw ctx.syntaxError(`Undefined variable name ${ctx.token.value}`);
   }
 
   ctx.diAssoc = "left";
-  return ctx.endNode(node, Syntax.Identifier);
+  return ctx.endNode(node, Type);
 };
 
 export default maybeIdentifier;

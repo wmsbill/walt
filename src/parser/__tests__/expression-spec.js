@@ -1,6 +1,6 @@
 import test from "ava";
 import expression from "../expression";
-// import printNode from "../../utils/print-node";
+import printNode from "../../utils/print-node";
 import { mockContext } from "../../utils/mocks";
 
 test("array: offset is constant", t => {
@@ -31,6 +31,36 @@ test("sequence, of compound expressions", t => {
 
 test("function calls", t => {
   const ctx = mockContext("test(1, 2 + 2 * 3, 3);");
+  ctx.func = {
+    locals: []
+  };
+  ctx.functions = [
+    {
+      id: "test",
+      meta: []
+    }
+  ];
+  const node = expression(ctx);
+  t.snapshot(node);
+});
+
+test("function calls in expressions", t => {
+  const ctx = mockContext("2 + test();");
+  ctx.func = {
+    locals: []
+  };
+  ctx.functions = [
+    {
+      id: "test",
+      meta: []
+    }
+  ];
+  const node = expression(ctx);
+  t.snapshot(node);
+});
+
+test("function parameters", t => {
+  const ctx = mockContext("test(2);");
   ctx.func = {
     locals: []
   };

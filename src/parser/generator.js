@@ -3,7 +3,7 @@ import { I32, I64, F32, F64 } from "../emitter/value_type";
 import opcode, { opcodeFromOperator } from "../emitter/opcode";
 import Syntax from "../Syntax";
 import curry from "curry";
-import { get, FUNCTION_INDEX } from "./metadata";
+import { get, FUNCTION_INDEX, LOCAL_INDEX, GLOBAL_INDEX } from "./metadata";
 
 // clean this up
 export const getType = str => {
@@ -19,11 +19,12 @@ export const getType = str => {
   }
 };
 
-const isLocal = node => "localIndex" in node;
 const scopeOperation = curry((op, node) => {
-  const index = isLocal(node) ? node.localIndex : node.globalIndex;
-  const kind = isLocal(node) ? op + "Local" : op + "Global";
-  return { kind: opcode[kind], params: [index] };
+  const local = get(LOCAL_INDEX, node);
+  const _global = get(GLOBAL_INDEX, node);
+  const index = local || _global;
+  const kind = local ? op + "Local" : op + "Global";
+  return { kind: opcode[kind], params: [index.payload] };
 });
 
 const getConstOpcode = node => ({
@@ -115,7 +116,7 @@ export const generateType = node => {
 export const generateReturn = node => {
   const parent = { postfix: [] };
   // Postfix in return statement should be a no-op UNLESS it's editing globals
-  const block = generateExpression(node.expr, parent);
+  const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
   block.push({ kind: opcode.Return });
   if (parent.postfix.length) {
     // do we have postfix operations?
@@ -264,7 +265,6 @@ export const generateAssignment = (node, parent) => {
 };
 
 const generateFunctionCall = (node, parent) => {
-  debugger;
   const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 
   block.push({
@@ -276,7 +276,6 @@ const generateFunctionCall = (node, parent) => {
 };
 
 const generateIndirectFunctionCall = (node, parent) => {
-  debugger;
   const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 
   block.push({
@@ -356,6 +355,7 @@ const syntaxMap = {
   [Syntax.TernaryExpression]: generateTernary,
   [Syntax.IfThenElse]: generateIf,
   [Syntax.Identifier]: getInScope,
+  [Syntax.FunctionIdentifier]: getInScope,
   [Syntax.ReturnStatement]: generateReturn,
   // Binary
   [Syntax.Declaration]: generateDeclaration,

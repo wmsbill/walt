@@ -30,7 +30,8 @@ const Syntax = {
   Sequence: "Sequence",
 
   // Semantic Nodes
-  FunctionIndex: "FunctionIndex"
+  FunctionIndex: "FunctionIndex",
+  FunctionIdentifier: "FunctionIdentifier"
 };
 
 module.exports = Syntax;

@@ -7,7 +7,7 @@ import { getAssociativty } from "./precedence";
 import type { Token, Node } from "../flow/types";
 
 function binary(ctx: Context, op: Token, params: Node[]) {
-  const node = ctx.startNode(params[0]);
+  const node: Node = ctx.startNode(params[0]);
   node.value = op.value;
   node.params = params;
   // FIXME: type of the binary expression should be more accurate
@@ -20,8 +20,6 @@ function binary(ctx: Context, op: Token, params: Node[]) {
     ctx.diAssoc = "right";
   } else if (node.value === "[") {
     Type = Syntax.ArraySubscript;
-  } else if (node.type === Syntax.FunctionCall) {
-    return functionCall(ctx, node);
   }
 
   return ctx.endNode(node, Type);
@@ -95,6 +93,8 @@ const operator = (ctx: Context, op: Token, operands: Node[]) => {
     case ",":
       return sequence(ctx, op, operands.slice(-2));
     default:
+      if (op.type === Syntax.FunctionCall)
+        return functionCall(ctx, op, operands);
       return binary(ctx, op, operands.splice(-2));
   }
 };
