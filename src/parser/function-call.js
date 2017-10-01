@@ -5,7 +5,6 @@ import type { Token, Node } from "../flow/types";
 import { writeFunctionPointer } from "./implicit-imports";
 
 const functionCall = (ctx: Context, op: Token, operands: Node[]) => {
-  debugger;
   const node = ctx.startNode(op);
   // If last operand is a sequence that means we have function arguments
   const maybeArguments = operands[operands.length - 1];

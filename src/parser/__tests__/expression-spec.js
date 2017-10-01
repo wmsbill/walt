@@ -1,6 +1,5 @@
 import test from "ava";
 import expression from "../expression";
-import printNode from "../../utils/print-node";
 import { mockContext } from "../../utils/mocks";
 
 test("array: offset is constant", t => {

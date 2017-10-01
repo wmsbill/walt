@@ -9,10 +9,10 @@
 // Base Character stream class
 class Stream {
 
-  constructor(input = '') {
+  constructor(input = "") {
     this.pos = this.line = this.col = 0;
     this.input = input;
-    this.lines = input.split('\n');
+    this.lines = input.split("\n");
     this.newLine();
   }
 
@@ -43,17 +43,17 @@ class Stream {
 
   // Is the character an end of line
   static eol(char) {
-    return char === '\n';
+    return char === "\n";
   }
 
   // Is the character an end of file
   static eof(char) {
-    return char === '';
+    return char === "";
   }
 
   // Is the charater a whitespace
   static whitespace(char) {
-    return char === "\n" || char === ' ' || char === "\t" || char === "\v" || char === "\r" || char === "\f";
+    return char === "\n" || char === " " || char === "\t" || char === "\v" || char === "\r" || char === "\f";
   }
 }
 
@@ -140,33 +140,40 @@ module.exports = wrap;
 });
 
 const Syntax = {
-  Keyword: 'Keyword',
-  Export: 'Export',
-  Import: 'Import',
-  Statement: 'Statement',
-  IfThenElse: 'IfThenElse',
-  UnaryExpression: 'UnaryExpression',
-  BinaryExpression: 'BinaryExpression',
-  TernaryExpression: 'TernaryExpression',
-  NumberLiteral: 'NumberLiteral',
-  StringLiteral: 'StringLiteral',
-  Punctuator: 'Punctuator',
-  Identifier: 'Identifier',
-  ArraySubscript: 'ArraySubscript',
-  Constant: 'Constant',
-  Type: 'Type',
-  Declaration: 'Declaration',
-  FunctionDeclaration: 'FunctionDeclaration',
-  ArrayDeclaration: 'ArrayDeclaration',
-  IndirectFunctionCall: 'IndirectFunctionCall',
-  FunctionCall: 'FunctionCall',
-  Loop: 'Loop',
-  Program: 'Program',
-  MemoryAssignment: 'MemoryAssignment',
-  Assignment: 'Assignment',
-  Param: 'Param',
-  Typedef: 'Typedef',
-  ReturnStatement: 'ReturnStatement'
+  // Syntax Nodes
+  Keyword: "Keyword",
+  Export: "Export",
+  Import: "Import",
+  Statement: "Statement",
+  IfThenElse: "IfThenElse",
+  UnaryExpression: "UnaryExpression",
+  BinaryExpression: "BinaryExpression",
+  TernaryExpression: "TernaryExpression",
+  NumberLiteral: "NumberLiteral",
+  StringLiteral: "StringLiteral",
+  Punctuator: "Punctuator",
+  Identifier: "Identifier",
+  ArraySubscript: "ArraySubscript",
+  Constant: "Constant",
+  Type: "Type",
+  Declaration: "Declaration",
+  FunctionDeclaration: "FunctionDeclaration",
+  ArrayDeclaration: "ArrayDeclaration",
+  IndirectFunctionCall: "IndirectFunctionCall",
+  FunctionCall: "FunctionCall",
+  Loop: "Loop",
+  Program: "Program",
+  MemoryAssignment: "MemoryAssignment",
+  Assignment: "Assignment",
+  Param: "Param",
+  Typedef: "Typedef",
+  ReturnStatement: "ReturnStatement",
+  Sequence: "Sequence",
+
+  // Semantic Nodes
+  FunctionIndex: "FunctionIndex",
+  FunctionIdentifier: "FunctionIdentifier",
+  FunctionPointer: "FunctionPointer"
 };
 
 var Syntax_1 = Syntax;
@@ -280,7 +287,7 @@ class Tokenizer {
    * @return {Object} token
    */
   next() {
-    let value = '';
+    let value = "";
     this.seekNonWhitespace();
     let char;
     let matchers = this.parsers;
@@ -297,6 +304,9 @@ class Tokenizer {
       this.stream.next();
       nextMatchers = this.match(this.stream.peek(), matchers);
     } while (!Stream.eol(this.stream.peek()) && !Stream.eof(this.stream.peek()) && !Stream.whitespace(this.stream.peek()) && nextMatchers.length > 0);
+
+    // If we fell off the end then bail out
+    if (Stream.eof(value)) return null;
 
     const token = this.token(value, matchers);
     token.start = start;
@@ -321,7 +331,7 @@ class Tokenizer {
    * @param {String} value Value to match
    * @return {Object} token
    */
-  token(value, parsers, token = { type: 'unknown', value }) {
+  token(value, parsers, token = { type: "unknown", value }) {
     // Strict parsers must end on a leaf node
     if (parsers.length > 1) {
       parsers = parsers.filter(parser => parser.strict ? parser.leaf : true);
@@ -337,7 +347,7 @@ class Tokenizer {
    * Seek Stream until next non-whitespace character. Can end in eof/eol
    */
   seekNonWhitespace() {
-    while (Stream.whitespace(this.stream.peek())) this.stream.next();
+    while (this.stream.peek() && Stream.whitespace(this.stream.peek())) this.stream.next();
   }
 
   parse() {
@@ -916,6 +926,63 @@ curry.adapt = function (fn) {
 
 var curry_1$1 = curry;
 
+//      
+
+
+const FUNCTION_INDEX = "function/index";
+const POSTFIX = "operator/postfix";
+const LOCAL_INDEX = "local/index";
+const GLOBAL_INDEX = "global/index";
+const TABLE_INDEX = "table/index";
+
+const make = (payload, type) => ({
+  type,
+  payload
+});
+
+const get = (type, node) => {
+  return node.meta.find(({ type: _type }) => _type === type) || null;
+};
+
+const funcIndex = payload => ({
+  payload,
+  type: FUNCTION_INDEX
+});
+
+const localIndex = payload => ({
+  payload,
+  type: LOCAL_INDEX
+});
+
+const globalIndex = payload => ({
+  payload,
+  type: GLOBAL_INDEX
+});
+
+const tableIndex = payload => ({
+  payload,
+  type: TABLE_INDEX
+});
+
+const postfix = payload => ({
+  payload,
+  type: POSTFIX
+});
+
+const metadata = {
+  make,
+  get,
+  postfix,
+  funcIndex,
+  localIndex,
+  globalIndex,
+  tableIndex,
+  POSTFIX,
+  LOCAL_INDEX,
+  FUNCTION_INDEX,
+  TABLE_INDEX
+};
+
 var _extends = Object.assign || function (target) {
   for (var i = 1; i < arguments.length; i++) {
     var source = arguments[i];
@@ -933,31 +1000,32 @@ var _extends = Object.assign || function (target) {
 // clean this up
 const getType = str => {
   switch (str) {
-    case 'f32':
+    case "f32":
       return F32;
-    case 'f64':
+    case "f64":
       return F64;
-    case 'i32':
-    case 'Function':
+    case "i32":
+    case "Function":
     default:
       return I32;
   }
 };
 
-const isLocal = node => 'localIndex' in node;
 const scopeOperation = curry_1$1((op, node) => {
-  const index = isLocal(node) ? node.localIndex : node.globalIndex;
-  const kind = isLocal(node) ? op + 'Local' : op + 'Global';
-  return { kind: def[kind], params: [index] };
+  const local = get(LOCAL_INDEX, node);
+  const _global = get(GLOBAL_INDEX, node);
+  const index = local || _global;
+  const kind = local ? op + "Local" : op + "Global";
+  return { kind: def[kind], params: [index.payload] };
 });
 
 const getConstOpcode = node => ({
-  kind: def[node.type + 'Const'] || def.i32Const,
+  kind: def[node.type + "Const"] || def.i32Const,
   params: [node.value]
 });
 
-const setInScope = scopeOperation('Set');
-const getInScope = scopeOperation('Get');
+const setInScope = scopeOperation("Set");
+const getInScope = scopeOperation("Get");
 const mergeBlock = (block, v) => {
   // some node types are a sequence of opcodes:
   // nested expressions for example
@@ -1026,7 +1094,7 @@ const generateInit = node => {
 
 const generateType = node => {
   const type = { params: [], result: null };
-  if (node.result && node.result !== 'void') {
+  if (node.result && node.result !== "void") {
     type.result = getType(node.result);
   }
 
@@ -1039,7 +1107,7 @@ const generateType = node => {
 const generateReturn = node => {
   const parent = { postfix: [] };
   // Postfix in return statement should be a no-op UNLESS it's editing globals
-  const block = generateExpression(node.expr, parent);
+  const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
   block.push({ kind: def.Return });
   if (parent.postfix.length) {
     // do we have postfix operations?
@@ -1063,7 +1131,6 @@ const generateDeclaration = (node, parent) => {
 
 const generateArrayDeclaration = (node, parent) => {
   const block = [];
-  debugger;
   if (node.init) {
     block.push.apply(block, generateExpression(node.init));
     block.push({ kind: def.SetLocal, params: [node.localIndex] });
@@ -1079,15 +1146,15 @@ const generateArraySubscript = (node, parent) => {
   //
   // Where param[0] is an Idetntifier and param[1] is the expression inside of
   // the square brackets.
-  const addNode = _extends({}, node, { params: node.params.slice(0, 2), value: '+' });
+  const addNode = _extends({}, node, { params: node.params.slice(0, 2), value: "+" });
   const addressBlock = generateBinaryExpression(addNode, parent);
 
   // now we generate the value block if any
-  const block = node.params.slice(2).map(mapSyntax(parent)).reduce(mergeBlock, []);
+  const block = [...addressBlock, { kind: def.i32Const, param: [4] }, { kind: def.i32Mul, params: [] }];
 
-  block.push.apply(block, addressBlock);
+  block.push.apply(block, node.params.slice(2).map(mapSyntax(parent)).reduce(mergeBlock, []));
 
-  const setOrLoad = node.meta[0] || 'Load';
+  const setOrLoad = node.meta[0] || "Load";
 
   // THe last piece is the WASM opcode. Either load or store
   block.push({
@@ -1109,7 +1176,7 @@ const generateArraySubscript = (node, parent) => {
 const generateBinaryExpression = (node, parent) => {
   // Map operands first
   const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
-
+  debugger;
   // Increment and decrement make this less clean:
   // If either increment or decrement then:
   //  1. generate the expression
@@ -1139,7 +1206,7 @@ const generateTernary = (node, parent) => {
   });
   block.push.apply(block, node.params.slice(1, 2).map(mapper).reduce(mergeBlock, []));
   block.push({
-    kind: opcodeFromOperator({ value: ':' })
+    kind: opcodeFromOperator({ value: ":" })
   });
   block.push.apply(block, node.params.slice(-1).map(mapper).reduce(mergeBlock, []));
   block.push({ kind: def.End });
@@ -1157,18 +1224,18 @@ const generateAssignment = (node, parent) => {
 };
 
 const generateFunctionCall = (node, parent) => {
-  const block = node.arguments.map(mapSyntax(parent)).reduce(mergeBlock, []);
+  const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 
   block.push({
     kind: def.Call,
-    params: [node.functionIndex]
+    params: [get(FUNCTION_INDEX, node).payload.functionIndex]
   });
 
   return block;
 };
 
 const generateIndirectFunctionCall = (node, parent) => {
-  const block = node.arguments.concat(node.params).map(mapSyntax(parent)).reduce(mergeBlock, []);
+  const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 
   block.push({
     kind: def.CallIndirect,
@@ -1176,6 +1243,13 @@ const generateIndirectFunctionCall = (node, parent) => {
   });
 
   return block;
+};
+
+const generateFunctionPointer = node => {
+  return {
+    kind: def.i32Const,
+    params: [get(TABLE_INDEX, node).payload]
+  };
 };
 
 // probably should be called "generateBranch" and be more generic
@@ -1209,12 +1283,12 @@ const generateLoop = (node, parent) => {
   const block = [];
   const mapper = mapSyntax(parent);
   const reverse = {
-    '>': '<',
-    '<': '>',
-    '>=': '<=',
-    '<=': '>=',
-    '==': '!=',
-    '!=': '=='
+    ">": "<",
+    "<": ">",
+    ">=": "<=",
+    "<=": ">=",
+    "==": "!=",
+    "!=": "=="
   };
 
   const condition = node.params.slice(1, 2);
@@ -1238,6 +1312,10 @@ const generateLoop = (node, parent) => {
   return block;
 };
 
+const generateSequence = (node, parent) => {
+  return node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
+};
+
 const syntaxMap = {
   [Syntax_1.FunctionCall]: generateFunctionCall,
   [Syntax_1.IndirectFunctionCall]: generateIndirectFunctionCall,
@@ -1247,6 +1325,8 @@ const syntaxMap = {
   [Syntax_1.TernaryExpression]: generateTernary,
   [Syntax_1.IfThenElse]: generateIf,
   [Syntax_1.Identifier]: getInScope,
+  [Syntax_1.FunctionIdentifier]: getInScope,
+  [Syntax_1.FunctionPointer]: generateFunctionPointer,
   [Syntax_1.ReturnStatement]: generateReturn,
   // Binary
   [Syntax_1.Declaration]: generateDeclaration,
@@ -1256,7 +1336,9 @@ const syntaxMap = {
   // Imports
   [Syntax_1.Import]: generateImport,
   // Loops
-  [Syntax_1.Loop]: generateLoop
+  [Syntax_1.Loop]: generateLoop,
+  // Comma separated lists
+  [Syntax_1.Sequence]: generateSequence
 };
 
 const mapSyntax = curry_1$1((parent, operand) => {
@@ -1332,15 +1414,7 @@ ${msg}
 };
 
 //      
-const findTypeIndex = (node, Types) => {
-  return Types.findIndex(t => {
-    const paramsMatch = t.params.length === node.params.length && t.params.reduce((a, v, i) => node.params[i] && a && v === getType(node.params[i].type), true);
 
-    const resultMatch = t.result == node.result || node.result && t.result === getType(node.result.type);
-
-    return paramsMatch && resultMatch;
-  });
-};
 
 /**
  * Context is used to parse tokens into an AST and IR used by the generator.
@@ -1352,14 +1426,16 @@ const findTypeIndex = (node, Types) => {
 
 class Context {
 
-  constructor(options = {
-    body: [],
-    diAssoc: 'right',
-    globals: [],
-    functions: [],
-    lines: []
-  }) {
-    Object.assign(this, options);
+  constructor(options) {
+    Object.assign(this, _extends({
+      body: [],
+      diAssoc: "right",
+      globals: [],
+      functions: [],
+      lines: [],
+      functionImports: [],
+      functionImportsLength: 0
+    }, options));
 
     this.Program = {
       body: [],
@@ -1376,23 +1452,23 @@ class Context {
   }
 
   syntaxError(msg, error) {
-    return new SyntaxError(generateErrorString(msg, error || '', this.token, this.lines[this.token.start.line - 1], this.filename || 'unknown', this.func && this.func.id || 'global'));
+    return new SyntaxError(generateErrorString(msg, error || "", this.token, this.lines[this.token.start.line - 1], this.filename || "unknown", this.func && this.func.id || "global"));
   }
 
   unexpectedValue(value) {
-    return this.syntaxError(`Expected: ${Array.isArray(value) ? value.join('|') : value}`, 'Unexpected value');
+    return this.syntaxError(`Expected: ${Array.isArray(value) ? value.join("|") : value}`, "Unexpected value");
   }
 
   unexpected(token) {
-    return this.syntaxError(`Expected: ${Array.isArray(token) ? token.join(' | ') : JSON.stringify(token)}`, `Unexpected token ${this.token.type}`);
+    return this.syntaxError(`Expected: ${Array.isArray(token) ? token.join(" | ") : JSON.stringify(token)}`, `Unexpected token ${this.token.type}`);
   }
 
   unknown({ value }) {
-    return this.syntaxError('Unknown token', value);
+    return this.syntaxError("Unknown token", value);
   }
 
   unsupported() {
-    return this.syntaxError('Language feature not supported', this.token.value);
+    return this.syntaxError("Language feature not supported", this.token.value);
   }
 
   expect(value, type) {
@@ -1427,7 +1503,7 @@ class Context {
 
   startNode(token = this.token) {
     return {
-      Type: '',
+      Type: "",
       value: token.value,
       range: [token.start],
       meta: [],
@@ -1442,144 +1518,17 @@ class Context {
       range: node.range.concat(token.end)
     });
   }
+
+  makeNode(node, syntax) {
+    return this.endNode(_extends({}, this.startNode(), node), syntax);
+  }
 }
-
-//      
-function binary(ctx, operator, params) {
-  const node = ctx.startNode(params[0]);
-  node.value = operator.value;
-  node.params = params;
-  node.type = operator.type;
-  node.isPostfix = operator.isPostfix;
-
-  ctx.diAssoc = 'left';
-  let Type = Syntax_1.BinaryExpression;
-  if (node.value === '=') {
-    Type = Syntax_1.Assignment;
-    ctx.diAssoc = 'right';
-  } else if (node.value === '[') {
-    Type = Syntax_1.ArraySubscript;
-  }
-
-  return ctx.endNode(node, Type);
-}
-
-function unary(ctx, operator, params) {
-  // Since WebAssembly has no 'native' support for incr/decr _opcode_ it's much simpler to
-  // convert this unary to a binary expression by throwing in an extra operand of 1
-  if (operator.value === '--' || operator.value === '++') {
-    // set isPostfix to help the IR generator
-    // TODO: abstract this to the generator?
-    const newParams = [...params];
-    const newOperator = _extends({}, operator);
-    newOperator.value = operator.value[0];
-    newOperator.isPostfix = operator.assoc === 'left';
-    newParams.push({ Type: Syntax_1.Constant, value: '1' });
-    return binary(ctx, newOperator, newParams);
-  }
-  const node = ctx.startNode(params[0]);
-  node.params = params;
-  node.value = operator.value;
-
-  return ctx.endNode(node, Syntax_1.UnaryExpression);
-}
-
-const ternary = (ctx, operator, params) => {
-  const node = ctx.startNode(params[0]);
-  node.params = params;
-  node.value = operator.value;
-  node.type = operator.type;
-
-  return ctx.endNode(node, Syntax_1.TernaryExpression);
-};
-
-// Abstraction for handling operations
-const operator = (ctx, operator, operands) => {
-  switch (operator.value) {
-    case '++':
-    case '--':
-      return unary(ctx, operator, operands.splice(-1));
-    case '?':
-      return ternary(ctx, operator, operands.splice(-3));
-    default:
-      return binary(ctx, operator, operands.splice(-2));
-  }
-};
-
-const constant$1 = ctx => {
-  const node = ctx.startNode();
-  node.value = ctx.token.value;
-  return ctx.endNode(node, Syntax_1.Constant);
-};
-
-// Utilities
-const precedence = {
-  '+': 0,
-  '-': 0,
-  '*': 1,
-  '/': 1,
-  '++': 2,
-  '--': 2,
-  '==': 2,
-  '!=': 2,
-  '=': 3,
-  ':': 4,
-  '?': 4,
-  '>': 5,
-  '<': 5
-};
-
-//      
-const argumentList = (ctx, type) => {
-  const list = [];
-  // return [];
-  ctx.expect(['(']);
-  while (ctx.token.value !== ')') list.push(argument(ctx, type));
-  // ctx.expect([')']);
-  return list;
-};
-
-const argument = (ctx, type) => {
-  const node = expression(ctx, type, token => predicate(token) && token.value !== ')');
-  ctx.eat([',']);
-  return node;
-};
-const functionCall = ctx => {
-  const node = ctx.startNode();
-  node.id = ctx.expect(null, Syntax_1.Identifier).value;
-
-  const maybePointer = ctx.func.locals.find(l => l.id === node.id);
-  const localIndex = ctx.func.locals.findIndex(({ id }) => id === node.id);
-
-  let Type = Syntax_1.FunctionCall;
-
-  if (maybePointer && localIndex > -1) {
-    Type = Syntax_1.IndirectFunctionCall;
-
-    node.params = [ctx.endNode({
-      range: [],
-      localIndex,
-      target: ctx.func.locals[localIndex],
-      type: ctx.func.locals[localIndex].type
-    }, Syntax_1.Identifier)];
-  } else {
-    node.functionIndex = ctx.functions.findIndex(({ id }) => id == node.id);
-
-    if (node.functionIndex === -1) throw ctx.syntaxError(`Undefined function: ${node.id}`);
-  }
-
-  const proto = ctx.functions[node.functionIndex];
-
-  node.arguments = argumentList(ctx, proto && proto.type || 'i32');
-
-  return ctx.endNode(node, Type);
-};
 
 //      
 const memoryImport = generateImport({
-  module: 'env',
+  module: "env",
   fields: [{
-    id: 'memory',
+    id: "memory",
     kind: EXTERN_MEMORY
   }]
 });
@@ -1587,45 +1536,123 @@ const memoryImport = generateImport({
 const writeFunctionPointer = (ctx, functionIndex) => {
   if (!ctx.Program.Element.length) {
     ctx.Program.Imports.push.apply(ctx.Program.Imports, generateImport({
-      module: 'env',
+      module: "env",
       fields: [{
-        id: 'table',
+        id: "table",
         kind: EXTERN_TABLE
       }]
     }));
   }
 
-  const exists = ctx.Program.Element.find(n => n.functionIndex === functionIndex);
-  if (exists == null) {
+  const exists = ctx.Program.Element.findIndex(n => n.functionIndex === functionIndex);
+  if (exists < 0) {
     ctx.Program.Element.push(generateElement(functionIndex));
+    return ctx.Program.Element.length - 1;
   }
+
+  return exists;
 };
 
 const importMemory = ctx => {
   if (!ctx.Program.Imports.find(({ kind }) => kind === EXTERN_MEMORY)) {
     ctx.Program.Imports.push.apply(ctx.Program.Imports, memoryImport);
 
-    const newNode = {
-      id: 'new',
-      params: [{ type: 'i32', isParam: true }],
-      result: 'i32',
-      typeIndex: 1 // ctx.Program.Types.length
-    };
+    const newNode = ctx.makeNode({
+      id: "new",
+      params: [{ type: "i32", isParam: true }],
+      result: "i32",
+      // ctx.Program.Types.length
+      typeIndex: 1,
+      meta: [make({ functionIndex: ctx.functionImports.length }, FUNCTION_INDEX)]
+    }, Syntax_1.FunctionDeclaration);
 
     ctx.Program.Types.push(generateType(newNode));
     ctx.Program.Imports.push.apply(ctx.Program.Imports, generateImport({
-      module: 'env',
+      module: "env",
       fields: [{
-        id: 'new',
+        id: "new",
         kind: EXTERN_FUNCTION,
         typeIndex: newNode.typeIndex
       }]
     }));
     ctx.Program.Functions.push(null);
+    ctx.functionImports.push(newNode);
   }
 };
 
 //      
+const functionCall = (ctx, op, operands) => {
+  debugger;
+  const node = ctx.startNode(op);
+  // If last operand is a sequence that means we have function arguments
+  const maybeArguments = operands[operands.length - 1];
+  if (maybeArguments && maybeArguments.Type !== Syntax_1.FunctionIdentifier) {
+    node.params = operands.splice(-1);
+  }
+
+  const identifier = operands.splice(-1)[0];
+  const maybePointer = ctx.func.locals.find(l => l.id === identifier.value);
+  const localIndex = ctx.func.locals.findIndex(({ id }) => id === identifier.value);
+
+  let Type = Syntax_1.FunctionCall;
+
+  if (maybePointer && localIndex > -1) {
+    Type = Syntax_1.IndirectFunctionCall;
+    const functionIndex = identifier.meta[0].payload;
+    node.params.push(identifier);
+  } else {
+    const func = ctx.functions.find(({ id }) => id == identifier.value);
+    if (!func) throw ctx.syntaxError(`Undefined function: ${identifier.value}`);
+
+    node.meta.push(_extends({}, func.meta[0]));
+  }
+
+  return ctx.endNode(node, Type);
+};
+
+// More or less JavaScript precedence
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
+
+const PRECEDENCE_PARAMS = -99;
+const PRECEDENCE_COMMA = -1;
+const PRECEDENCE_ADDITION = 0;
+const PRECEDENCE_SUBTRACTION = 0;
+const PRECEDENCE_MULTIPLY = 1;
+const PRECEDENCE_DIVIDE = 1;
+const PRECEDENCE_INCREMENT = 2;
+
+
+const PRECEDENCE_FUNCTION_CALL = 19;
+
+const precedence = {
+  "(": PRECEDENCE_PARAMS,
+  ",": PRECEDENCE_COMMA,
+  "+": PRECEDENCE_ADDITION,
+  "-": PRECEDENCE_SUBTRACTION,
+  "*": PRECEDENCE_MULTIPLY,
+  "/": PRECEDENCE_DIVIDE,
+  "++": PRECEDENCE_INCREMENT,
+  "--": 2,
+  "==": 2,
+  "!=": 2,
+  "=": 3,
+  ":": 4,
+  "?": 4,
+  ">": 5,
+  "<": 5
+};
+
+//      
+const findTypeIndex$1 = (node, ctx) => {
+  return ctx.Program.Types.findIndex(t => {
+    const paramsMatch = t.params.length === node.params.length && t.params.reduce((a, v, i) => node.params[i] && a && v === getType(node.params[i].type), true);
+
+    const resultMatch = t.result == node.result || node.result && t.result === getType(node.result.type);
+
+    return paramsMatch && resultMatch;
+  });
+};
+
 const findFieldIndex = fields => (ctx, token) => {
   let field = fields.reduce((memo, f) => {
     if (memo) return memo[f];
@@ -1639,84 +1666,176 @@ const findFieldIndex = fields => (ctx, token) => {
   return -1;
 };
 
-const findLocalIndex = findFieldIndex(['func', 'locals']);
-const findGlobalIndex = findFieldIndex(['globals']);
-const findFunctionIndex = findFieldIndex(['functions']);
+const findLocalIndex = findFieldIndex(["func", "locals"]);
+const findGlobalIndex = findFieldIndex(["globals"]);
+const findFunctionIndex = findFieldIndex(["functions"]);
+
+// FIXME: do all of this inline here
+// FIXME: add a symbol for function call
+const getPrecedence = token => {
+  return precedence[token.value];
+};
+const getAssociativty = token => {
+  switch (token.value) {
+    case "+":
+    case "-":
+    case "/":
+    case "*":
+    case ":":
+      return "left";
+    case "=":
+    case "--":
+    case "++":
+    case "?":
+      return "right";
+    default:
+      return "left";
+  }
+};
+
+//      
+function binary(ctx, op, params) {
+  const node = ctx.startNode(params[0]);
+  node.value = op.value;
+  node.params = params;
+  // FIXME: type of the binary expression should be more accurate
+  node.type = params[0].type || "i32";
+
+  ctx.diAssoc = "left";
+  let Type = Syntax_1.BinaryExpression;
+  if (node.value === "=") {
+    Type = Syntax_1.Assignment;
+    ctx.diAssoc = "right";
+  } else if (node.value === "[") {
+    Type = Syntax_1.ArraySubscript;
+  }
+
+  return ctx.endNode(node, Type);
+}
+
+function unary(ctx, op, params) {
+  // Since WebAssembly has no 'native' support for incr/decr _opcode_ it's much simpler to
+  // convert this unary to a binary expression by throwing in an extra operand of 1
+  if (op.value === "--" || op.value === "++") {
+    const newParams = [...params, ctx.makeNode({
+      value: "1"
+    }, Syntax_1.Constant)];
+    const newOperator = binary(ctx, _extends({}, op), newParams);
+    newOperator.meta.push(metadata.postfix(true));
+    newOperator.value = op.value[0];
+    newOperator.isPostfix = getAssociativty(op) === "left";
+    return newOperator;
+  }
+  const node = ctx.startNode(params[0]);
+  node.params = params;
+  node.value = op.value;
+
+  return ctx.endNode(node, Syntax_1.UnaryExpression);
+}
+
+const ternary = (ctx, op, params) => {
+  const node = ctx.startNode(params[0]);
+  node.params = params;
+  node.value = op.value;
+  node.type = params[params.length - 1].type;
+
+  return ctx.endNode(node, Syntax_1.TernaryExpression);
+};
+
+const flattenSequence = sequence => {
+  return sequence.reduce((memo, node) => {
+    if (node.Type === Syntax_1.Sequence) {
+      memo.push.apply(memo, flattenSequence(node.params));
+    } else {
+      memo.push(node);
+    }
+
+    return memo;
+  }, []);
+};
+
+// Sequence is a list of comma separated nodes. It's a slighlty special operator
+// in that it unrolls any other sequences into it's own params
+const sequence = (ctx, op, params) => {
+  const node = ctx.startNode(params[0]);
+  node.value = op.value;
+  node.params = flattenSequence(params);
+  node.type = op.type;
+  return ctx.endNode(node, Syntax_1.Sequence);
+};
+
+// Abstraction for handling operations
+const operator = (ctx, op, operands) => {
+  switch (op.value) {
+    case "++":
+    case "--":
+      return unary(ctx, op, operands.splice(-1));
+    case "?":
+      return ternary(ctx, op, operands.splice(-3));
+    case ",":
+      return sequence(ctx, op, operands.slice(-2));
+    default:
+      if (op.type === Syntax_1.FunctionCall) return functionCall(ctx, op, operands);
+      return binary(ctx, op, operands.splice(-2));
+  }
+};
+
+const constant$1 = ctx => {
+  const node = ctx.startNode();
+  const value = ctx.token.value;
+  if (value.toString().indexOf(".") !== -1) node.type = "f32";else node.type = "i32";
+  node.value = value;
+  return ctx.endNode(node, Syntax_1.Constant);
+};
 
 //     
 // Maybe identifier, maybe function call
 const maybeIdentifier = ctx => {
   const node = ctx.startNode();
-  const localIndex = findLocalIndex(ctx, ctx.token);
-  const globalIndex = findGlobalIndex(ctx, ctx.token);
+  const localIndex$$1 = findLocalIndex(ctx, ctx.token);
+  const globalIndex$$1 = findGlobalIndex(ctx, ctx.token);
   const functionIndex = findFunctionIndex(ctx, ctx.token);
-  const nextToken = ctx.stream.peek();
-  const isFuncitonCall = nextToken.value === '(';
-  const isArraySubscript = nextToken.value === '[';
 
-  // Function pointer
-  if (!isFuncitonCall && localIndex < 0 && globalIndex < 0 && functionIndex > -1) {
-    // Save the element
-    writeFunctionPointer(ctx, functionIndex);
-    // Encode a function pointer as a i32.const representing the function index
-    const tableIndex = ctx.Program.Element.findIndex(e => e.functionIndex === functionIndex);
-    node.value = tableIndex;
-    return ctx.endNode(node, Syntax_1.Constant);
-  } else if (isFuncitonCall) {
-    // if function call then encode it as such
-    return functionCall(ctx);
-  }
-
+  let Type = Syntax_1.Identifier;
   // Not a function call or pointer, look-up variables
-  if (localIndex !== -1) {
-    node.localIndex = localIndex;
-    node.target = ctx.func.locals[localIndex];
-    node.type = node.target.type;
-  } else if (globalIndex !== -1) {
-    node.globalIndex = globalIndex;
-    node.target = ctx.globals[node.globalIndex];
-    node.type = node.target.type;
+  if (localIndex$$1 !== -1) {
+    node.type = ctx.func.locals[localIndex$$1].type;
+    node.meta.push(metadata.localIndex(localIndex$$1));
+  } else if (globalIndex$$1 !== -1) {
+    node.type = ctx.globals[globalIndex$$1].type;
+    node.meta.push(metadata.globalIndex(globalIndex$$1));
+  } else if (functionIndex !== -1 && ctx.stream.peek().value !== "(") {
+    debugger;
+    node.type = "i32";
+    Type = Syntax_1.FunctionPointer;
+    node.meta.push(metadata.tableIndex(writeFunctionPointer(ctx, functionIndex)));
+  } else if (functionIndex == -1) {
+    throw ctx.syntaxError(`Undefined variable name ${ctx.token.value}`);
   }
 
-  ctx.diAssoc = 'left';
-  return ctx.endNode(node, Syntax_1.Identifier);
+  ctx.diAssoc = "left";
+  return ctx.endNode(node, Type);
 };
 
 //      
 const last = list => list[list.length - 1];
 
-const assoc = op => {
-  switch (op) {
-    case '+':
-    case '-':
-    case '/':
-    case '*':
-    case ':':
-      return 'left';
-    case '=':
-    case '--':
-    case '++':
-    case '?':
-      return 'right';
-    default:
-      return 'left';
-  }
-};
-
 const valueIs = v => o => o.value === v;
 
-const isLBracket = valueIs('(');
-const isRBracket = valueIs(')');
-const isRSqrBracket = valueIs(']');
-const isLSqrBracket = valueIs('[');
-const isTStart = valueIs('?');
-const isTEnd = valueIs(':');
-const predicate = token => token.value !== ';' && token.value !== ',';
+const isLBracket = valueIs("(");
+const isLSqrBracket = valueIs("[");
+const isTStart = valueIs("?");
+const predicate = (token, depth) => token.value !== ";" && depth > 0;
 
 // Shunting yard
-const expression = (ctx, type = 'i32', check = predicate) => {
+const expression = (ctx, type = "i32", check = predicate) => {
   const operators = [];
   const operands = [];
+  // Depth is the nesting level of brackets in this expression. If we find a
+  // closing bracket which causes our depth to fall below 1, then we know we
+  // should exit the expression.
+  let depth = 1;
+  let eatFunctionCall = false;
 
   const consume = () => operands.push(operator(ctx, operators.pop(), operands));
 
@@ -1728,48 +1847,82 @@ const expression = (ctx, type = 'i32', check = predicate) => {
     }
   };
 
-  while (ctx.token && check(ctx.token)) {
-    if (ctx.token.type === Syntax_1.Constant) operands.push(constant$1(ctx));else if (ctx.token.type === Syntax_1.Identifier) operands.push(maybeIdentifier(ctx));else if (ctx.token.type === Syntax_1.Punctuator) {
-      const op = _extends({}, ctx.token, {
-        precedence: precedence[ctx.token.value],
-        assoc: 'left',
-        type
-      });
+  const flushOperators = (precedence, value) => {
+    let previous = null;
+    while ((previous = last(operators)) && previous.Type !== Syntax_1.Sequence && getPrecedence(previous) >= precedence && getAssociativty(previous) === "left") {
+      if (value === "," && previous.type === Syntax_1.FunctionCall) break;
+      consume();
+    }
+  };
 
-      // Increment, decrement are a bit annoying...
-      // we don't know if it's left associative or right without a lot of gymnastics
-      if (ctx.token.value === '--' || ctx.token.value === '++') {
-        // As we create different nodes the diAssoc is changed
-        op.assoc = ctx.diAssoc;
-      } else {
-        // vanilla binary operator
-        op.assoc = assoc(op.value);
+  const process = () => {
+    if (ctx.token.type === Syntax_1.Constant) {
+      eatFunctionCall = false;
+      operands.push(constant$1(ctx));
+    } else if (ctx.token.type === Syntax_1.Identifier) {
+      eatFunctionCall = true;
+      operands.push(maybeIdentifier(ctx));
+    } else if (ctx.token.type === Syntax_1.Punctuator) {
+      switch (ctx.token.value) {
+        case "(":
+          depth++;
+          // Function call.
+          // TODO: figure out a cleaner(?) way of doing this, maybe
+          if (eatFunctionCall) {
+            // definetly not immutable
+            last(operands).Type = Syntax_1.FunctionIdentifier;
+            flushOperators(PRECEDENCE_FUNCTION_CALL);
+            // Tokenizer does not generate function call tokens it is our job here
+            // to generate a function call on the fly
+            operators.push(_extends({}, ctx.token, {
+              type: Syntax_1.FunctionCall
+            }));
+            ctx.next();
+            const expr = expression(ctx);
+            if (expr) operands.push(expr);
+            return false;
+          } else {
+            operators.push(ctx.token);
+          }
+          break;
+        case "[":
+          operators.push(ctx.token);
+          break;
+        case "]":
+          eatUntil(isLSqrBracket);
+          consume();
+          break;
+        case ":":
+          eatUntil(isTStart);
+          break;
+        case ")":
+          {
+            depth--;
+            if (depth < 1) return false;
+            // If we are not in a group already find the last LBracket,
+            // consume everything until that point
+            eatUntil(isLBracket);
+            const previous = last(operators);
+            if (previous && previous.type === Syntax_1.FunctionCall) consume();else if (depth > 0)
+              // Pop left bracket
+              operators.pop();
+
+            break;
+          }
+        default:
+          {
+            flushOperators(getPrecedence(ctx.token), ctx.token.value);
+            operators.push(ctx.token);
+          }
       }
-
-      if (isLBracket(op) || isLSqrBracket(op)) {
-        operators.push(op);
-      } else if (isTEnd(op)) {
-        eatUntil(isTStart);
-      } else if (isRBracket(op)) {
-        // If we are not in a group already find the last LBracket,
-        // consume everything until that point
-        eatUntil(isLBracket);
-
-        // Pop left bracket
-        operators.pop();
-      } else if (isRSqrBracket(op)) {
-        eatUntil(isLSqrBracket);
-        // instead of popping the square bracket (like the parens) we consume it
-        // and create a array-subscript operation
-        consume();
-      } else {
-        while (last(operators) && last(operators).precedence >= op.precedence && last(operators).assoc === 'left') consume();
-
-        operators.push(op);
-      }
+      eatFunctionCall = false;
     }
 
-    ctx.next();
+    return true;
+  };
+
+  while (ctx.token && check(ctx.token, depth)) {
+    if (process()) ctx.next();
   }
 
   while (operators.length) consume();
@@ -1804,12 +1957,17 @@ const arrayDeclaration = (node, ctx) => {
     ctx.expect([')']);
 
     init.id = 'new';
-    init.arguments = [{
-      value: 14,
-      Type: Syntax_1.Constant,
+    init.params = [ctx.makeNode({
+      params: [],
+      meta: [],
+      range: [],
+      value: node.size * 4,
       type: 'i32'
+    }, Syntax_1.Constant)];
+
+    init.meta = [{
+      functionIndex: ctx.functionImports.findIndex(({ id }) => id === 'new')
     }];
-    init.functionIndex = 0;
 
     node.init = ctx.endNode(init, Syntax_1.FunctionCall);
   }
@@ -1845,77 +2003,83 @@ const last$1 = list => list[list.length - 1];
 
 const paramList = ctx => {
   const paramList = [];
-  ctx.expect(['(']);
-  while (ctx.token.value !== ')') paramList.push(param(ctx));
-  ctx.expect([')']);
+  ctx.expect(["("]);
+  while (ctx.token.value !== ")") paramList.push(param(ctx));
+  ctx.expect([")"]);
   return paramList;
 };
 
 const param = ctx => {
   const node = ctx.startNode();
   node.id = ctx.expect(null, Syntax_1.Identifier).value;
-  ctx.expect([':']);
+  ctx.expect([":"]);
 
   // maybe a custom type
   const identifier = ctx.token.value;
   if (ctx.eat(null, Syntax_1.Identifier)) {
     // find the type
     node.typePointer = ctx.Program.Types.find(({ id }) => id === identifier);
-    if (node.typePointer == null) throw ctx.syntaxError('Undefined Type', identifier);
+    if (node.typePointer == null) throw ctx.syntaxError("Undefined Type", identifier);
 
-    node.type = 'i32';
+    node.type = "i32";
   } else {
     node.type = ctx.expect(null, Syntax_1.Type).value;
   }
 
   node.isParam = true;
 
-  ctx.eat([',']);
+  ctx.eat([","]);
   return ctx.endNode(node, Syntax_1.Param);
 };
 
 const maybeFunctionDeclaration = ctx => {
   const node = ctx.startNode();
-  if (!ctx.eat(['function'])) return declaration(ctx);
+  if (!ctx.eat(["function"])) return declaration(ctx);
 
   ctx.func = node;
   node.func = true;
   node.id = ctx.expect(null, Syntax_1.Identifier).value;
   node.params = paramList(ctx);
   node.locals = [...node.params];
-  ctx.expect([':']);
+  ctx.expect([":"]);
   node.result = ctx.expect(null, Syntax_1.Type).value;
-  node.result = node.result === 'void' ? null : node.result;
+  node.result = node.result === "void" ? null : node.result;
 
   // NOTE: We need to write function into Program BEFORE
   // we parse the body as the body may refer to the function
   // itself recursively
   // Either re-use an existing type or write a new one
-  const typeIndex = findTypeIndex(node, ctx.Program.Types);
+  const typeIndex = findTypeIndex$1(node, ctx);
   if (typeIndex !== -1) {
     node.typeIndex = typeIndex;
   } else {
+    // attach to a type index
     node.typeIndex = ctx.Program.Types.length;
     ctx.Program.Types.push(generateType(node));
   }
-  // attach to a type index
-  node.functionIndex = ctx.Program.Functions.length + 1;
+
+  node.meta = [make({
+    get functionIndex() {
+      return node.functionIndex + ctx.functionImportsLength;
+    }
+  }, FUNCTION_INDEX)];
+  node.functionIndex = ctx.Program.Functions.length;
   ctx.Program.Functions.push(node.typeIndex);
   ctx.functions.push(node);
 
-  ctx.expect(['{']);
+  ctx.expect(["{"]);
   node.body = [];
   let stmt = null;
-  while (ctx.token && ctx.token.value !== '}') {
+  while (ctx.token && ctx.token.value !== "}") {
     stmt = statement(ctx);
     if (stmt) node.body.push(stmt);
   }
 
   // Sanity check the return statement
-  const ret = last$1(node.body);
+  const ret = last$1(node.params);
   if (ret && node.type) {
-    if (node.type === 'void' && ret.Type === Syntax_1.ReturnStatement) throw ctx.syntaxError('Unexpected return value in a function with result : void');
-    if (node.type !== 'void' && ret.Type !== Syntax_1.ReturnStatement) throw ctx.syntaxError('Expected a return value in a function with result : ' + node.result);
+    if (node.type === "void" && ret.Type === Syntax_1.ReturnStatement) throw ctx.syntaxError("Unexpected return value in a function with result : void");
+    if (node.type !== "void" && ret.Type !== Syntax_1.ReturnStatement) throw ctx.syntaxError("Expected a return value in a function with result : " + node.result);
   } else if (node.result) {}
   // throw ctx.syntaxError(`Return type expected ${node.result}, received ${JSON.stringify(ret)}`);
 
@@ -1923,7 +2087,7 @@ const maybeFunctionDeclaration = ctx => {
   // generate the code block for the emiter
   ctx.Program.Code.push(generateCode(node));
 
-  ctx.expect(['}']);
+  ctx.expect(["}"]);
   ctx.func = null;
 
   return ctx.endNode(node, Syntax_1.FunctionDeclaration);
@@ -1952,7 +2116,7 @@ const field = ctx => {
     id: ctx.expect(null, Syntax_1.Identifier).value
   };
 
-  ctx.expect([':']);
+  ctx.expect([":"]);
   const typeString = ctx.token.value;
   if (ctx.eat(null, Syntax_1.Type)) {
     // native type, aka GLOBAL export
@@ -1976,7 +2140,13 @@ const field = ctx => {
     }
 
     // attach to a type index
-    f.functionIndex = ctx.Program.Functions.length;
+    const functionIndex = ctx.Program.Functions.length;
+    f.meta = [make({
+      functionIndex
+    }, FUNCTION_INDEX)];
+
+    f.functionIndex = functionIndex;
+
     ctx.Program.Functions.push(null);
     ctx.functions.push(f);
   }
@@ -1986,26 +2156,26 @@ const field = ctx => {
 
 const fieldList = ctx => {
   const fields = [];
-  while (ctx.token.value !== '}') {
+  while (ctx.token.value !== "}") {
     const f = field(ctx);
     if (f) {
       fields.push(f);
-      ctx.eat([',']);
+      ctx.eat([","]);
     }
   }
-  ctx.expect(['}']);
+  ctx.expect(["}"]);
 
   return fields;
 };
 
 const _import = ctx => {
   const node = ctx.startNode();
-  ctx.eat(['import']);
+  ctx.eat(["import"]);
 
-  if (!ctx.eat(['{'])) throw ctx.syntaxError('expected {');
+  if (!ctx.eat(["{"])) throw ctx.syntaxError("expected {");
 
   node.fields = fieldList(ctx);
-  ctx.expect(['from']);
+  ctx.expect(["from"]);
 
   node.module = ctx.expect(null, Syntax_1.StringLiteral).value;
   // NOTE: string literals contain the starting and ending quote char
@@ -2062,36 +2232,36 @@ const type$1 = ctx => {
 
 //     
 const paramList$1 = ctx => {
-  ctx.expect(['(']);
+  ctx.expect(["("]);
   const params = [];
   let node = null;
-  while (ctx.token.value && ctx.token.value !== ')') {
-    node = expression(ctx, 'i32', token => predicate(token) && token.value !== ')');
+  while (ctx.token.value && ctx.token.value !== ")") {
+    node = expression(ctx, "i32");
     if (node) {
       params.push(node);
-      ctx.eat([';']);
+      ctx.eat([";"]);
     }
   }
 
-  ctx.expect([')']);
+  ctx.expect([")"]);
   return params;
 };
 
 const forLoop = ctx => {
   const node = ctx.startNode();
-  ctx.eat(['for']);
+  ctx.eat(["for"]);
 
   node.params = paramList$1(ctx);
 
-  ctx.expect(['{']);
+  ctx.expect(["{"]);
 
   node.body = [];
   let stmt = null;
-  while (ctx.token && ctx.token.value !== '}') {
+  while (ctx.token && ctx.token.value !== "}") {
     stmt = statement(ctx);
     if (stmt) node.body.push(stmt);
   }
-  ctx.expect(['}']);
+  ctx.expect(["}"]);
 
   return ctx.endNode(node, Syntax_1.Loop);
 };
@@ -2099,35 +2269,37 @@ const forLoop = ctx => {
 //     
 const whileLoop = ctx => {
   const node = ctx.startNode();
-  ctx.eat(['while']);
-  ctx.expect(['(']);
+  ctx.eat(["while"]);
+  ctx.expect(["("]);
 
-  node.params = [null, expression(ctx, 'i32', token => predicate(token) && token.value !== ')')];
+  node.params = [null, expression(ctx, "i32")];
 
-  ctx.expect([')']);
-  ctx.expect(['{']);
+  ctx.expect([")"]);
+  ctx.expect(["{"]);
 
   node.body = [];
   let stmt = null;
-  while (ctx.token && ctx.token.value !== '}') {
+  while (ctx.token && ctx.token.value !== "}") {
     stmt = statement(ctx);
     if (stmt) node.body.push(stmt);
   }
 
-  ctx.expect(['}']);
+  ctx.expect(["}"]);
 
   return ctx.endNode(node, Syntax_1.Loop);
 };
 
 const returnStatement = ctx => {
   const node = ctx.startNode();
-  if (!ctx.func) throw ctx.syntaxError('Return statement is only valid inside a function');
-  ctx.expect(['return']);
-  node.expr = expression(ctx);
+  if (!ctx.func) throw ctx.syntaxError("Return statement is only valid inside a function");
+  ctx.expect(["return"]);
+  const expr = expression(ctx);
 
   // For generator to emit correct consant they must have a correct type
   // in the syntax it's not necessary to define the type since we can infer it here
-  if (node.expr.type && ctx.func.result !== node.expr.type) throw ctx.syntaxError('Return type mismatch');else if (!node.expr.type && ctx.func.result) node.expr.type = ctx.func.result;
+  if (expr.type && ctx.func.result !== expr.type) throw ctx.syntaxError("Return type mismatch");else if (!expr.type && ctx.func.result) expr.type = ctx.func.result;
+
+  node.params.push(expr);
 
   return ctx.endNode(node, Syntax_1.ReturnStatement);
 };
@@ -2138,36 +2310,35 @@ const ifThenElse = ctx => {
     then: [],
     else: []
   });
-  ctx.eat(['if']);
-
+  ctx.eat(["if"]);
   // First operand is the expression
-  ctx.expect(['(']);
-  node.expr = expression(ctx, 'i32', token => predicate(token) && token.value !== ')');
-  ctx.expect([')']);
+  ctx.expect(["("]);
+  node.expr = expression(ctx, "i32");
+  ctx.expect([")"]);
 
   // maybe a curly brace or not
-  if (ctx.eat(['{'])) {
+  if (ctx.eat(["{"])) {
     let stmt = null;
-    while (ctx.token && ctx.token.value !== '}') {
+    while (ctx.token && ctx.token.value !== "}") {
       stmt = statement(ctx);
       if (stmt) node.then.push(stmt);
     }
 
-    ctx.expect(['}']);
+    ctx.expect(["}"]);
 
-    if (ctx.eat(['else'])) {
-      ctx.expect(['{']);
-      while (ctx.token && ctx.token.value !== '}') {
+    if (ctx.eat(["else"])) {
+      ctx.expect(["{"]);
+      while (ctx.token && ctx.token.value !== "}") {
         stmt = statement(ctx);
         if (stmt) node.else.push(stmt);
       }
-      ctx.expect(['}']);
+      ctx.expect(["}"]);
     }
   } else {
     // parse single statements only
     node.then.push(statement(ctx));
-    ctx.expect([';']);
-    if (ctx.eat(['else'])) node.else.push(statement(ctx));
+    ctx.expect([";"]);
+    if (ctx.eat(["else"])) node.else.push(statement(ctx));
   }
 
   return ctx.endNode(node, Syntax_1.IfThenElse);
@@ -2740,7 +2911,7 @@ const getIR = source => {
 // Compiles a raw binary wasm buffer
 const compile = source => {
   const wasm = getIR(source);
-  console.log(wasm.debug());
+  // console.log(wasm.debug());
   return wasm.buffer();
 };
 

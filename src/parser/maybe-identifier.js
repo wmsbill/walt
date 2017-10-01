@@ -26,7 +26,6 @@ const maybeIdentifier = (ctx: Context): Node => {
     node.type = ctx.globals[globalIndex].type;
     node.meta.push(meta.globalIndex(globalIndex));
   } else if (functionIndex !== -1 && ctx.stream.peek().value !== "(") {
-    debugger;
     node.type = "i32";
     Type = Syntax.FunctionPointer;
     node.meta.push(meta.tableIndex(writeFunctionPointer(ctx, functionIndex)));

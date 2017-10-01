@@ -18,7 +18,7 @@ test("function call, no arguments", t => {
   t.snapshot(nodes);
 });
 
-test.only("function call, in a return", t => {
+test("function call, in a return", t => {
   const ctx = mockContext("return test();");
   ctx.func = {
     locals: []
@@ -30,9 +30,5 @@ test.only("function call, in a return", t => {
     }
   ];
   const nodes = statement(ctx);
-
-  console.log(ctx.token);
-  console.log(printNode(nodes));
-  debugger;
-  // t.snapshot(nodes);
+  t.snapshot(nodes);
 });
