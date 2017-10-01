@@ -62,7 +62,6 @@ const expression = (
     }
   };
 
-  debugger;
   const process = () => {
     if (ctx.token.type === Syntax.Constant) {
       eatFunctionCall = false;

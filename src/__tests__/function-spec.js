@@ -6,36 +6,33 @@ const compileAndRun = (src, imports) =>
 const outputIs = (t, value) => result =>
   t.is(result.instance.exports.test(), value);
 
-test.skip("function call", t =>
+test("function call", t =>
   compileAndRun(`
   function two(): i32 {
     return 2;
   }
   export function test(): i32 {
     return 2 + two();
-  }`).then(outputIs(t, 4))
-);
+  }`).then(outputIs(t, 4)));
 
-test.skip("function params", t =>
+test("function params", t =>
   compileAndRun(`
   function addTwo(x: i32): i32 {
     return x + 2;
   }
   export function test(): i32 {
     return addTwo(2);
-  }`).then(outputIs(t, 4))
-);
+  }`).then(outputIs(t, 4)));
 
-test.skip("function scope", t =>
+test("function scope", t =>
   compileAndRun(`
   const x: i32 = 32;
   export function test(): i32 {
     let x: i32 = 42;
     return x;
-  }`).then(outputIs(t, 42))
-);
+  }`).then(outputIs(t, 42)));
 
-test.skip("undefined function vars", t =>
+test("undefined function vars", t =>
   t.throws(() => {
     compileAndRun(`
     const x: i32 = 99;
@@ -43,10 +40,9 @@ test.skip("undefined function vars", t =>
       let x: i32 = 42;
       return y;
     }`);
-  })
-);
+  }));
 
-test.skip("function pointers", t => {
+test("function pointers", t => {
   const table = new WebAssembly.Table({ element: "anyfunc", initial: 10 });
   return compileAndRun(
     `

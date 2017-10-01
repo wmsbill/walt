@@ -3,7 +3,7 @@ import Syntax from "../Syntax";
 import Context from "./context";
 import metadata from "./metadata";
 import functionCall from "./function-call";
-import { getAssociativty } from "./precedence";
+import { getAssociativty } from "./introspection";
 import type { Token, Node } from "../flow/types";
 
 function binary(ctx: Context, op: Token, params: Node[]) {
@@ -29,20 +29,20 @@ function unary(ctx: Context, op: Token, params: Node[]) {
   // Since WebAssembly has no 'native' support for incr/decr _opcode_ it's much simpler to
   // convert this unary to a binary expression by throwing in an extra operand of 1
   if (op.value === "--" || op.value === "++") {
-    const newParams = [...params];
-    const newOperator = { ...op };
-    newOperator.meta.push(metadata.postfix(true));
-    newOperator.value = op.value[0];
-    newOperator.isPostfix = getAssociativty(op) === "left";
-    newParams.push(
+    const newParams = [
+      ...params,
       ctx.makeNode(
         {
           value: "1"
         },
         Syntax.Constant
       )
-    );
-    return binary(ctx, newOperator, newParams);
+    ];
+    const newOperator = binary(ctx, { ...op }, newParams);
+    newOperator.meta.push(metadata.postfix(true));
+    newOperator.value = op.value[0];
+    newOperator.isPostfix = getAssociativty(op) === "left";
+    return newOperator;
   }
   const node = ctx.startNode(params[0]);
   node.params = params;

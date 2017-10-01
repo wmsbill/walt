@@ -17,7 +17,6 @@ const maybeIdentifier = (ctx: Context): Node => {
   const globalIndex = findGlobalIndex(ctx, ctx.token);
   const functionIndex = findFunctionIndex(ctx, ctx.token);
 
-  debugger;
   let Type = Syntax.Identifier;
   // Not a function call or pointer, look-up variables
   if (localIndex !== -1) {
@@ -27,10 +26,10 @@ const maybeIdentifier = (ctx: Context): Node => {
     node.type = ctx.globals[globalIndex].type;
     node.meta.push(meta.globalIndex(globalIndex));
   } else if (functionIndex !== -1 && ctx.stream.peek().value !== "(") {
+    debugger;
     node.type = "i32";
     Type = Syntax.FunctionPointer;
-    node.meta.push(meta.get(meta.FUNCTION_INDEX, ctx.functions[functionIndex]));
-    writeFunctionPointer(ctx, functionIndex);
+    node.meta.push(meta.tableIndex(writeFunctionPointer(ctx, functionIndex)));
   } else if (functionIndex == -1) {
     throw ctx.syntaxError(`Undefined variable name ${ctx.token.value}`);
   }

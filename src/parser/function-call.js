@@ -25,7 +25,6 @@ const functionCall = (ctx: Context, op: Token, operands: Node[]) => {
     Type = Syntax.IndirectFunctionCall;
     const functionIndex = identifier.meta[0].payload;
     node.params.push(identifier);
-    writeFunctionPointer(ctx, functionIndex);
   } else {
     const func = ctx.functions.find(({ id }) => id == identifier.value);
     if (!func) throw ctx.syntaxError(`Undefined function: ${identifier.value}`);

@@ -3,7 +3,13 @@ import { I32, I64, F32, F64 } from "../emitter/value_type";
 import opcode, { opcodeFromOperator } from "../emitter/opcode";
 import Syntax from "../Syntax";
 import curry from "curry";
-import { get, FUNCTION_INDEX, LOCAL_INDEX, GLOBAL_INDEX } from "./metadata";
+import {
+  get,
+  TABLE_INDEX,
+  FUNCTION_INDEX,
+  LOCAL_INDEX,
+  GLOBAL_INDEX
+} from "./metadata";
 
 // clean this up
 export const getType = str => {
@@ -196,7 +202,7 @@ export const generateArraySubscript = (node, parent) => {
 export const generateBinaryExpression = (node, parent) => {
   // Map operands first
   const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
-
+  debugger;
   // Increment and decrement make this less clean:
   // If either increment or decrement then:
   //  1. generate the expression
@@ -289,7 +295,7 @@ const generateIndirectFunctionCall = (node, parent) => {
 const generateFunctionPointer = node => {
   return {
     kind: opcode.i32Const,
-    params: [get(FUNCTION_INDEX, node).payload.functionIndex]
+    params: [get(TABLE_INDEX, node).payload]
   };
 };
 
@@ -353,6 +359,10 @@ export const generateLoop = (node, parent) => {
   return block;
 };
 
+const generateSequence = (node, parent) => {
+  return node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
+};
+
 const syntaxMap = {
   [Syntax.FunctionCall]: generateFunctionCall,
   [Syntax.IndirectFunctionCall]: generateIndirectFunctionCall,
@@ -373,7 +383,9 @@ const syntaxMap = {
   // Imports
   [Syntax.Import]: generateImport,
   // Loops
-  [Syntax.Loop]: generateLoop
+  [Syntax.Loop]: generateLoop,
+  // Comma separated lists
+  [Syntax.Sequence]: generateSequence
 };
 
 export const mapSyntax = curry((parent, operand) => {

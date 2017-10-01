@@ -46,7 +46,7 @@ test("function pointers", t =>
       }
 
       export function test(): void {
-        setTimeout(echo, 200);
+        setTimeout(echo, 5);
       }
     `,
       {

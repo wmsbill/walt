@@ -38,12 +38,15 @@ export const writeFunctionPointer = (
     );
   }
 
-  const exists = ctx.Program.Element.find(
+  const exists = ctx.Program.Element.findIndex(
     n => n.functionIndex === functionIndex
   );
-  if (exists == null) {
+  if (exists < 0) {
     ctx.Program.Element.push(generateElement(functionIndex));
+    return ctx.Program.Element.length - 1;
   }
+
+  return exists;
 };
 
 export const importMemory = (ctx: Context): void => {
