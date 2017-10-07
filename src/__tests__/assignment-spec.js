@@ -9,12 +9,11 @@ test("declration assignment", t =>
   compileAndRun(
     "export function test(): i32 { let x: i32 = 2; return x; }"
   ).then(outputIs(t, 2)));
-test.only("assigment statement", t =>
+test("assigment statement", t =>
   compileAndRun(`
   export function test(): i32 {
     let x: i32 = 0;
     let y: i32 = 2;
     x = y + 2;
     return x;
-  }`).then(outputIs(t, 4))
-);
+  }`).then(outputIs(t, 4)));

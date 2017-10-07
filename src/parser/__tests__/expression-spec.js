@@ -2,11 +2,10 @@ import test from "ava";
 import expression from "../expression";
 import { mockContext } from "../../utils/mocks";
 
-test.only("array: offset is constant", t => {
+test("array: offset is constant", t => {
   const ctx = mockContext("b[1] + 5");
   ctx.globals = [{ id: "b", type: "i32" }];
   const node = expression(ctx);
-  debugger;
   t.snapshot(node);
 });
 
@@ -61,6 +60,7 @@ test("function calls in expressions", t => {
 
 test("function parameters", t => {
   const ctx = mockContext("test(2);");
+
   ctx.func = {
     locals: []
   };
