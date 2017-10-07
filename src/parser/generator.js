@@ -1,3 +1,4 @@
+// This thing is getting pretty large, should break this file up
 import { EXTERN_GLOBAL, EXTERN_FUNCTION } from "../emitter/external_kind";
 import { I32, I64, F32, F64 } from "../emitter/value_type";
 import opcode, { opcodeFromOperator } from "../emitter/opcode";
