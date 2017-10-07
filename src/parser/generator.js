@@ -2,6 +2,7 @@ import { EXTERN_GLOBAL, EXTERN_FUNCTION } from "../emitter/external_kind";
 import { I32, I64, F32, F64 } from "../emitter/value_type";
 import opcode, { opcodeFromOperator } from "../emitter/opcode";
 import Syntax from "../Syntax";
+import invariant from "invariant";
 import curry from "curry";
 import {
   get,
@@ -24,6 +25,8 @@ export const getType = str => {
       return I32;
   }
 };
+
+let syntaxMap = {};
 
 const scopeOperation = curry((op, node) => {
   const local = get(LOCAL_INDEX, node);
@@ -48,21 +51,39 @@ const mergeBlock = (block, v) => {
   return block;
 };
 
-export const generateExport = decl => {
+export const mapSyntax = curry((parent, operand) => {
+  const mapping = syntaxMap[operand.Type];
+  if (!mapping) {
+    const value =
+      operand.id ||
+      operand.value ||
+      (operand.operator && operand.operator.value);
+    throw new Error(`Unexpected Syntax Token ${operand.Type} : ${value}`);
+  }
+  return mapping(operand, parent);
+});
+
+export const generateExport = node => {
   const _export = {};
-  if (decl && decl.init) {
-    _export.index = decl.globalIndex;
-    _export.kind = EXTERN_GLOBAL;
-    _export.field = decl.id;
+  if (node && node.init) {
+    return {
+      index: node.globalIndex,
+      kind: EXTERN_GLOBAL,
+      field: node.id
+    };
   }
 
-  if (decl && decl.func) {
-    _export.index = decl.functionIndex;
-    _export.kind = EXTERN_FUNCTION;
-    _export.field = decl.id;
+  if (node && node.func) {
+    return {
+      get index() {
+        return get(FUNCTION_INDEX, node).payload.functionIndex;
+      },
+      kind: EXTERN_FUNCTION,
+      field: node.id
+    };
   }
 
-  return _export;
+  invariant(false, "Unknown Export");
 };
 
 export const generateImport = node => {
@@ -155,35 +176,16 @@ export const generateArrayDeclaration = (node, parent) => {
 };
 
 export const generateArraySubscript = (node, parent) => {
-  // We need to create a copy of the node and generate a binary addition.
-  //
-  // Memory Address = param[0] + param[1];
-  //
-  // Where param[0] is an Idetntifier and param[1] is the expression inside of
-  // the square brackets.
-  const addNode = { ...node, params: node.params.slice(0, 2), value: "+" };
-  const addressBlock = generateBinaryExpression(addNode, parent);
-
-  // now we generate the value block if any
   const block = [
-    ...addressBlock,
-    { kind: opcode.i32Const, param: [4] },
-    { kind: opcode.i32Mul, params: [] }
+    ...node.params.map(mapSyntax(parent)).reduce(mergeBlock, []),
+    { kind: opcode.i32Const, params: [4] },
+    { kind: opcode.i32Mul, params: [] },
+    { kind: opcode.i32Add, params: [] }
   ];
 
-  block.push.apply(
-    block,
-    node.params
-      .slice(2)
-      .map(mapSyntax(parent))
-      .reduce(mergeBlock, [])
-  );
-
-  const setOrLoad = node.meta[0] || "Load";
-
-  // THe last piece is the WASM opcode. Either load or store
+  // The last piece is the WASM opcode. Either load or store
   block.push({
-    kind: opcode[node.type + setOrLoad],
+    kind: opcode[node.type + "Load"],
     params: [
       // Alignment
       // TODO: make this extendible
@@ -202,7 +204,6 @@ export const generateArraySubscript = (node, parent) => {
 export const generateBinaryExpression = (node, parent) => {
   // Map operands first
   const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
-  debugger;
   // Increment and decrement make this less clean:
   // If either increment or decrement then:
   //  1. generate the expression
@@ -363,7 +364,39 @@ const generateSequence = (node, parent) => {
   return node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 };
 
-const syntaxMap = {
+const generateMemoryAssignment = (node, parent) => {
+  const block = [
+    ...node.params[0].params.map(mapSyntax(parent)).reduce(mergeBlock, []),
+    // FIXME: 4 needs to be configurable
+    { kind: opcode.i32Const, params: [4] },
+    { kind: opcode.i32Mul, params: [] },
+    { kind: opcode.i32Add, params: [] }
+  ];
+
+  block.push.apply(
+    block,
+    node.params
+      .slice(1)
+      .map(mapSyntax(parent))
+      .reduce(mergeBlock, [])
+  );
+
+  // The last piece is the WASM opcode. Either load or store
+  block.push({
+    kind: opcode[node.type + "Store"],
+    params: [
+      // Alignment
+      // TODO: make this extendible
+      2,
+      // Memory. Always 0 in the WASM MVP
+      0
+    ]
+  });
+
+  return block;
+};
+
+syntaxMap = {
   [Syntax.FunctionCall]: generateFunctionCall,
   [Syntax.IndirectFunctionCall]: generateIndirectFunctionCall,
   // Unary
@@ -380,6 +413,8 @@ const syntaxMap = {
   [Syntax.ArrayDeclaration]: generateArrayDeclaration,
   [Syntax.ArraySubscript]: generateArraySubscript,
   [Syntax.Assignment]: generateAssignment,
+  // Memory
+  [Syntax.MemoryAssignment]: generateMemoryAssignment,
   // Imports
   [Syntax.Import]: generateImport,
   // Loops
@@ -387,18 +422,6 @@ const syntaxMap = {
   // Comma separated lists
   [Syntax.Sequence]: generateSequence
 };
-
-export const mapSyntax = curry((parent, operand) => {
-  const mapping = syntaxMap[operand.Type];
-  if (!mapping) {
-    const value =
-      operand.id ||
-      operand.value ||
-      (operand.operator && operand.operator.value);
-    throw new Error(`Unexpected Syntax Token ${operand.Type} : ${value}`);
-  }
-  return mapping(operand, parent);
-});
 
 export const generateExpression = (node, parent) => {
   const block = [node].map(mapSyntax(parent)).reduce(mergeBlock, []);

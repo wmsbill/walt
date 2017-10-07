@@ -41,7 +41,6 @@ function unary(ctx: Context, op: Token, params: Node[]) {
     const newOperator = binary(ctx, { ...op }, newParams);
     newOperator.meta.push(metadata.postfix(true));
     newOperator.value = op.value[0];
-    newOperator.isPostfix = getAssociativty(op) === "left";
     return newOperator;
   }
   const node = ctx.startNode(params[0]);

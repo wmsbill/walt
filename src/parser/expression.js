@@ -94,9 +94,11 @@ const expression = (
           }
           break;
         case "[":
+          depth++;
           operators.push(ctx.token);
           break;
         case "]":
+          depth--;
           eatUntil(isLSqrBracket);
           consume();
           break;

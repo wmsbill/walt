@@ -793,6 +793,55 @@ const opcodeFromOperator = ({ type, value }) => {
   }
 };
 
+/**
+ * Copyright 2013-2015, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
+
+/**
+ * Use invariant() to assert state which your program assumes to be true.
+ *
+ * Provide sprintf-style format (only %s is supported) and arguments
+ * to provide information about what broke and what you were
+ * expecting.
+ *
+ * The invariant message will be stripped in production, but the invariant
+ * will remain to ensure logic does not differ in production.
+ */
+
+var NODE_ENV = undefined;
+
+var invariant = function (condition, format, a, b, c, d, e, f) {
+  if (NODE_ENV !== 'production') {
+    if (format === undefined) {
+      throw new Error('invariant requires an error message argument');
+    }
+  }
+
+  if (!condition) {
+    var error;
+    if (format === undefined) {
+      error = new Error('Minified exception occurred; use the non-minified dev environment ' + 'for the full error message and additional helpful warnings.');
+    } else {
+      var args = [a, b, c, d, e, f];
+      var argIndex = 0;
+      error = new Error(format.replace(/%s/g, function () {
+        return args[argIndex++];
+      }));
+      error.name = 'Invariant Violation';
+    }
+
+    error.framesToPop = 1; // we don't care about invariant's own frame
+    throw error;
+  }
+};
+
+var invariant_1 = invariant;
+
 var slice = Array.prototype.slice;
 var toArray = function (a) {
     return slice.call(a);
@@ -983,20 +1032,6 @@ const metadata = {
   TABLE_INDEX
 };
 
-var _extends = Object.assign || function (target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i];
-
-    for (var key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        target[key] = source[key];
-      }
-    }
-  }
-
-  return target;
-};
-
 // clean this up
 const getType = str => {
   switch (str) {
@@ -1010,6 +1045,8 @@ const getType = str => {
       return I32;
   }
 };
+
+let syntaxMap = {};
 
 const scopeOperation = curry_1$1((op, node) => {
   const local = get(LOCAL_INDEX, node);
@@ -1033,21 +1070,36 @@ const mergeBlock = (block, v) => {
   return block;
 };
 
-const generateExport = decl => {
+const mapSyntax = curry_1$1((parent, operand) => {
+  const mapping = syntaxMap[operand.Type];
+  if (!mapping) {
+    const value = operand.id || operand.value || operand.operator && operand.operator.value;
+    throw new Error(`Unexpected Syntax Token ${operand.Type} : ${value}`);
+  }
+  return mapping(operand, parent);
+});
+
+const generateExport = node => {
   const _export = {};
-  if (decl && decl.init) {
-    _export.index = decl.globalIndex;
-    _export.kind = EXTERN_GLOBAL;
-    _export.field = decl.id;
+  if (node && node.init) {
+    return {
+      index: node.globalIndex,
+      kind: EXTERN_GLOBAL,
+      field: node.id
+    };
   }
 
-  if (decl && decl.func) {
-    _export.index = decl.functionIndex;
-    _export.kind = EXTERN_FUNCTION;
-    _export.field = decl.id;
+  if (node && node.func) {
+    return {
+      get index() {
+        return get(FUNCTION_INDEX, node).payload.functionIndex;
+      },
+      kind: EXTERN_FUNCTION,
+      field: node.id
+    };
   }
 
-  return _export;
+  invariant_1(false, "Unknown Export");
 };
 
 const generateImport = node => {
@@ -1140,25 +1192,11 @@ const generateArrayDeclaration = (node, parent) => {
 };
 
 const generateArraySubscript = (node, parent) => {
-  // We need to create a copy of the node and generate a binary addition.
-  //
-  // Memory Address = param[0] + param[1];
-  //
-  // Where param[0] is an Idetntifier and param[1] is the expression inside of
-  // the square brackets.
-  const addNode = _extends({}, node, { params: node.params.slice(0, 2), value: "+" });
-  const addressBlock = generateBinaryExpression(addNode, parent);
+  const block = [...node.params.map(mapSyntax(parent)).reduce(mergeBlock, []), { kind: def.i32Const, params: [4] }, { kind: def.i32Mul, params: [] }, { kind: def.i32Add, params: [] }];
 
-  // now we generate the value block if any
-  const block = [...addressBlock, { kind: def.i32Const, param: [4] }, { kind: def.i32Mul, params: [] }];
-
-  block.push.apply(block, node.params.slice(2).map(mapSyntax(parent)).reduce(mergeBlock, []));
-
-  const setOrLoad = node.meta[0] || "Load";
-
-  // THe last piece is the WASM opcode. Either load or store
+  // The last piece is the WASM opcode. Either load or store
   block.push({
-    kind: def[node.type + setOrLoad],
+    kind: def[node.type + "Load"],
     params: [
     // Alignment
     // TODO: make this extendible
@@ -1176,7 +1214,6 @@ const generateArraySubscript = (node, parent) => {
 const generateBinaryExpression = (node, parent) => {
   // Map operands first
   const block = node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
-  debugger;
   // Increment and decrement make this less clean:
   // If either increment or decrement then:
   //  1. generate the expression
@@ -1316,7 +1353,28 @@ const generateSequence = (node, parent) => {
   return node.params.map(mapSyntax(parent)).reduce(mergeBlock, []);
 };
 
-const syntaxMap = {
+const generateMemoryAssignment = (node, parent) => {
+  const block = [...node.params[0].params.map(mapSyntax(parent)).reduce(mergeBlock, []),
+  // FIXME: 4 needs to be configurable
+  { kind: def.i32Const, params: [4] }, { kind: def.i32Mul, params: [] }, { kind: def.i32Add, params: [] }];
+
+  block.push.apply(block, node.params.slice(1).map(mapSyntax(parent)).reduce(mergeBlock, []));
+
+  // The last piece is the WASM opcode. Either load or store
+  block.push({
+    kind: def[node.type + "Store"],
+    params: [
+    // Alignment
+    // TODO: make this extendible
+    2,
+    // Memory. Always 0 in the WASM MVP
+    0]
+  });
+
+  return block;
+};
+
+syntaxMap = {
   [Syntax_1.FunctionCall]: generateFunctionCall,
   [Syntax_1.IndirectFunctionCall]: generateIndirectFunctionCall,
   // Unary
@@ -1333,6 +1391,8 @@ const syntaxMap = {
   [Syntax_1.ArrayDeclaration]: generateArrayDeclaration,
   [Syntax_1.ArraySubscript]: generateArraySubscript,
   [Syntax_1.Assignment]: generateAssignment,
+  // Memory
+  [Syntax_1.MemoryAssignment]: generateMemoryAssignment,
   // Imports
   [Syntax_1.Import]: generateImport,
   // Loops
@@ -1340,15 +1400,6 @@ const syntaxMap = {
   // Comma separated lists
   [Syntax_1.Sequence]: generateSequence
 };
-
-const mapSyntax = curry_1$1((parent, operand) => {
-  const mapping = syntaxMap[operand.Type];
-  if (!mapping) {
-    const value = operand.id || operand.value || operand.operator && operand.operator.value;
-    throw new Error(`Unexpected Syntax Token ${operand.Type} : ${value}`);
-  }
-  return mapping(operand, parent);
-});
 
 const generateExpression = (node, parent) => {
   const block = [node].map(mapSyntax(parent)).reduce(mergeBlock, []);
@@ -1411,6 +1462,20 @@ ${Line}
 ${highlight} ${error}
 ${msg}
   at ${func} (${filename}:${line}:${col})`;
+};
+
+var _extends = Object.assign || function (target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i];
+
+    for (var key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        target[key] = source[key];
+      }
+    }
+  }
+
+  return target;
 };
 
 //      
@@ -1582,7 +1647,6 @@ const importMemory = ctx => {
 
 //      
 const functionCall = (ctx, op, operands) => {
-  debugger;
   const node = ctx.startNode(op);
   // If last operand is a sequence that means we have function arguments
   const maybeArguments = operands[operands.length - 1];
@@ -1636,6 +1700,8 @@ const precedence = {
   "==": 2,
   "!=": 2,
   "=": 3,
+  "-=": 3,
+  "+=": 3,
   ":": 4,
   "?": 4,
   ">": 5,
@@ -1723,7 +1789,6 @@ function unary(ctx, op, params) {
     const newOperator = binary(ctx, _extends({}, op), newParams);
     newOperator.meta.push(metadata.postfix(true));
     newOperator.value = op.value[0];
-    newOperator.isPostfix = getAssociativty(op) === "left";
     return newOperator;
   }
   const node = ctx.startNode(params[0]);
@@ -1805,7 +1870,6 @@ const maybeIdentifier = ctx => {
     node.type = ctx.globals[globalIndex$$1].type;
     node.meta.push(metadata.globalIndex(globalIndex$$1));
   } else if (functionIndex !== -1 && ctx.stream.peek().value !== "(") {
-    debugger;
     node.type = "i32";
     Type = Syntax_1.FunctionPointer;
     node.meta.push(metadata.tableIndex(writeFunctionPointer(ctx, functionIndex)));
@@ -1886,9 +1950,11 @@ const expression = (ctx, type = "i32", check = predicate) => {
           }
           break;
         case "[":
+          depth++;
           operators.push(ctx.token);
           break;
         case "]":
+          depth--;
           eatUntil(isLSqrBracket);
           consume();
           break;
@@ -1944,30 +2010,31 @@ const generate = (ctx, node) => {
 };
 
 const arrayDeclaration = (node, ctx) => {
-  ctx.expect([']']);
-  ctx.expect(['=']);
+  ctx.expect(["]"]);
+  ctx.expect(["="]);
 
   importMemory(ctx);
 
-  if (ctx.eat(['new'], Syntax_1.Keyword)) {
+  // FIXME: This should be pretty easy to parse with a simple expression
+  if (ctx.eat(["new"], Syntax_1.Keyword)) {
     const init = ctx.startNode();
-    ctx.expect(['Array']);
-    ctx.expect(['(']);
+    ctx.expect(["Array"]);
+    ctx.expect(["("]);
     node.size = parseInt(ctx.expect(null, Syntax_1.Constant).value);
-    ctx.expect([')']);
+    ctx.expect([")"]);
 
-    init.id = 'new';
+    init.id = "new";
     init.params = [ctx.makeNode({
       params: [],
       meta: [],
       range: [],
       value: node.size * 4,
-      type: 'i32'
+      type: "i32"
     }, Syntax_1.Constant)];
 
-    init.meta = [{
-      functionIndex: ctx.functionImports.findIndex(({ id }) => id === 'new')
-    }];
+    init.meta = [metadata.funcIndex({
+      functionIndex: ctx.functionImports.findIndex(({ id }) => id === "new")
+    })];
 
     node.init = ctx.endNode(init, Syntax_1.FunctionCall);
   }
@@ -1979,20 +2046,20 @@ const arrayDeclaration = (node, ctx) => {
 
 const declaration = ctx => {
   const node = ctx.startNode();
-  node.const = ctx.token.value === 'const';
-  if (!ctx.eat(['const', 'let', 'function'])) throw ctx.unexpectedValue(['const', 'let', 'function']);
+  node.const = ctx.token.value === "const";
+  if (!ctx.eat(["const", "let", "function"])) throw ctx.unexpectedValue(["const", "let", "function"]);
 
   node.id = ctx.expect(null, Syntax_1.Identifier).value;
-  ctx.expect([':']);
+  ctx.expect([":"]);
 
   node.type = ctx.expect(null, Syntax_1.Type).value;
-  if (ctx.eat(['['])) {
+  if (ctx.eat(["["])) {
     return arrayDeclaration(node, ctx);
   }
 
-  if (ctx.eat(['='])) node.init = expression(ctx, node.type);
+  if (ctx.eat(["="])) node.init = expression(ctx, node.type);
 
-  if (node.const && !node.init) throw ctx.syntaxError('Constant value must be initialized');
+  if (node.const && !node.init) throw ctx.syntaxError("Constant value must be initialized");
 
   generate(ctx, node);
 
@@ -2060,7 +2127,7 @@ const maybeFunctionDeclaration = ctx => {
 
   node.meta = [make({
     get functionIndex() {
-      return node.functionIndex + ctx.functionImportsLength;
+      return node.functionIndex + ctx.functionImports.length;
     }
   }, FUNCTION_INDEX)];
   node.functionIndex = ctx.Program.Functions.length;
@@ -2371,24 +2438,10 @@ const keyword$1 = ctx => {
 };
 
 //      
-// Maybe this should be a modified ArraySubscript?
+// Parse the expression and set the appropriate Type for the egenerator
 const memoryStore = ctx => {
-  const node = expression(ctx, 'i32',
-  // quit at '='
-  token => predicate(token) && token.value !== '=');
-
-  ctx.expect(['=']);
-
-  const rhs = expression(ctx);
-
-  // NOTE:
-  // Left hand side is an expression resolving to a memory address and must
-  // be pused to the stack last for correct IR to be generated
-  node.params.push(rhs);
-
-  node.meta = ['Store'];
-
-  return ctx.endNode(node, Syntax_1.ArraySubscript);
+  const node = expression(ctx, "i32");
+  return ctx.endNode(node, Syntax_1.MemoryAssignment);
 };
 
 // It is easier to parse assignment this way as we need to maintain a valid type
@@ -2473,55 +2526,6 @@ class Parser {
     return node;
   }
 }
-
-/**
- * Copyright 2013-2015, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- */
-
-/**
- * Use invariant() to assert state which your program assumes to be true.
- *
- * Provide sprintf-style format (only %s is supported) and arguments
- * to provide information about what broke and what you were
- * expecting.
- *
- * The invariant message will be stripped in production, but the invariant
- * will remain to ensure logic does not differ in production.
- */
-
-var NODE_ENV = undefined;
-
-var invariant = function (condition, format, a, b, c, d, e, f) {
-  if (NODE_ENV !== 'production') {
-    if (format === undefined) {
-      throw new Error('invariant requires an error message argument');
-    }
-  }
-
-  if (!condition) {
-    var error;
-    if (format === undefined) {
-      error = new Error('Minified exception occurred; use the non-minified dev environment ' + 'for the full error message and additional helpful warnings.');
-    } else {
-      var args = [a, b, c, d, e, f];
-      var argIndex = 0;
-      error = new Error(format.replace(/%s/g, function () {
-        return args[argIndex++];
-      }));
-      error.name = 'Invariant Violation';
-    }
-
-    error.framesToPop = 1; // we don't care about invariant's own frame
-    throw error;
-  }
-};
-
-var invariant_1 = invariant;
 
 // Used to output raw binary, holds values and types in a large array 'stream'
 class OutputStream {
@@ -2801,14 +2805,13 @@ const emit$6 = types => {
 // TODO
 const emitLocal = (stream, local) => {
   if (local.isParam == null) {
-    stream.push(varuint32, 1, 'number of locals of following type');
+    stream.push(varuint32, 1, "number of locals of following type");
     stream.push(varint7, local.type, `${getTypeString(local.type)}`);
   }
 };
 
 const emitFunctionBody = (stream, { locals, code }) => {
   // write bytecode into a clean buffer
-  debugger;
   const body = new OutputStream();
 
   code.forEach(({ kind, params, valueType }) => {
@@ -2816,8 +2819,8 @@ const emitFunctionBody = (stream, { locals, code }) => {
     body.push(index_9, kind.code, kind.text);
 
     if (valueType) {
-      body.push(index_9, valueType.type, 'result type');
-      body.push(index_9, valueType.mutable, 'mutable');
+      body.push(index_9, valueType.type, "result type");
+      body.push(index_9, valueType.mutable, "mutable");
     }
 
     // map over all params, if any and encode each one
@@ -2838,7 +2841,7 @@ const emitFunctionBody = (stream, { locals, code }) => {
         default:
           type = varuint32;
       }
-      body.push(type, p, ' ');
+      body.push(type, p, " ");
     });
   });
 
@@ -2847,18 +2850,18 @@ const emitFunctionBody = (stream, { locals, code }) => {
   locals.forEach(local => emitLocal(localsStream, local));
 
   // body size is
-  stream.push(varuint32, body.size + localsStream.size + 2, 'body size in bytes');
-  stream.push(varuint32, locals.length, 'locals count');
+  stream.push(varuint32, body.size + localsStream.size + 2, "body size in bytes");
+  stream.push(varuint32, locals.length, "locals count");
 
   stream.write(localsStream);
   stream.write(body);
-  stream.push(index_9, def.End.code, 'end');
+  stream.push(index_9, def.End.code, "end");
 };
 
 const emit$7 = functions => {
   // do stuff with ast
   const stream = new OutputStream();
-  stream.push(varuint32, functions.length, 'function count');
+  stream.push(varuint32, functions.length, "function count");
   functions.forEach(func => emitFunctionBody(stream, func));
 
   return stream;
@@ -2911,7 +2914,6 @@ const getIR = source => {
 // Compiles a raw binary wasm buffer
 const compile = source => {
   const wasm = getIR(source);
-  // console.log(wasm.debug());
   return wasm.buffer();
 };
 

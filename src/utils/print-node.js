@@ -2,7 +2,6 @@
 import type { Node } from "../flow/types";
 
 const printNode = (node: Node, level: number = 0): string => {
-  throw "WHATEVER";
   const typeString = `${node.type ? "<" + node.type + ">" : ""}`;
   const metaString = `(${node.meta.map(JSON.stringify).join(",")})`;
   let out = `${node.Type}${typeString} ${node.value} ${metaString}\n`;

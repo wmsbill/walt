@@ -69,7 +69,7 @@ const maybeFunctionDeclaration = ctx => {
     make(
       {
         get functionIndex() {
-          return node.functionIndex + ctx.functionImportsLength;
+          return node.functionIndex + ctx.functionImports.length;
         }
       },
       FUNCTION_INDEX

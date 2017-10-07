@@ -1,10 +1,16 @@
 import test from "ava";
 import assignment from "../maybe-assignment";
-import printNode from "../../utils/print-node";
 import { mockContext } from "../../utils/mocks";
 
-test.skip("array assignment", t => {
-  const ctx = mockContext("x[0] = 2;");
-  const nodes = assignment(ctx);
-  t.snapshot(nodes);
+test("array assignment", t => {
+  const ctx = mockContext("x[0] = 3488 + 458 * 122;");
+  ctx.func = {
+    locals: [
+      {
+        id: "x"
+      }
+    ]
+  };
+  const node = assignment(ctx);
+  t.snapshot(node);
 });
