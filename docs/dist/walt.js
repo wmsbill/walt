@@ -248,20 +248,20 @@ const tokenParser = token(parse, Syntax_1.Identifier);
 
 const supported$1 = [
 // EcmaScript
-'break', 'if', 'else', 'import', 'from', 'export', 'return', 'switch', 'case', 'default', 'const', 'let', 'for', 'continue', 'do', 'while',
+"break", "if", "else", "import", "from", "export", "return", "switch", "case", "default", "const", "let", "for", "continue", "do", "while",
 
 // walt replacement, matching s-expression syntax
-'function',
+"function",
 
 // s-expression
-'global', 'module', 'memory', 'table', 'type',
+"global", "module", "memory", "table", "type",
 
 // specials/asserts
-'invoke', 'assert', 'assert_return',
+"invoke", "assert", "assert_return",
 
 // additional syntax
 // statically replaced with consant value at compile time
-'sizeof'];
+"sizeof"];
 
 const trie$3 = new trie$1(supported$1);
 const root = trie$3.fsearch;
@@ -1032,6 +1032,7 @@ const metadata = {
   TABLE_INDEX
 };
 
+// This thing is getting pretty large, should break this file up
 // clean this up
 const getType = str => {
   switch (str) {
@@ -2497,13 +2498,13 @@ class Parser {
   constructor(tokens, lines = []) {
     this.context = new Context({
       body: [],
-      diAssoc: 'right',
+      diAssoc: "right",
       stream: tokens,
       token: tokens.next(),
       lines,
       globals: [],
       functions: [],
-      filename: 'unknown.walt'
+      filename: "unknown.walt"
     });
   }
 
@@ -2537,13 +2538,13 @@ class OutputStream {
     this.size = 0;
   }
 
-  push(type, value, debug = '') {
+  push(type, value, debug = "") {
     let size = 0;
     switch (type) {
-      case 'varuint7':
-      case 'varuint32':
-      case 'varint7':
-      case 'varint1':
+      case "varuint7":
+      case "varuint32":
+      case "varint7":
+      case "varint1":
         {
           // Encode all of the LEB128 aka 'var*' types
           value = this.encode(value);
@@ -2587,25 +2588,13 @@ class OutputStream {
     let pc = 0;
     this.data.forEach(({ type, value }) => {
       if (Array.isArray(value)) {
-        value.forEach((v, i) => index_14(index_9, pc++, view, v));
+        value.forEach(v => index_14(index_9, pc++, view, v));
       } else {
         index_14(type, pc, view, value);
         pc += index_16[type];
       }
     });
     return buffer;
-  }
-
-  debug(begin = 0, end) {
-    let pc = 0;
-    return this.data.slice(begin, end).map(({ type, value, debug }) => {
-      const pcString = pc.toString(16).padStart(8, '0').padEnd(this.data.length.toString().length + 1);
-      let valueString;
-      if (Array.isArray(value)) valueString = value.map(v => v.toString(16)).join().padStart(12);else valueString = value.toString(16).padStart(12);
-      const out = `${pcString}: ${valueString} ; ${debug}`;
-      pc += index_16[type] || value.length;
-      return out;
-    }).join('\n') + "\n ============ fin =============";
   }
 
   // Writes source OutputStream into the current buffer
@@ -2895,6 +2884,20 @@ function emit(ast = {}) {
   return stream.write(write()).write(section.type(ast)).write(section.imports(ast)).write(section.function(ast)).write(section.globals(ast)).write(section.exports(ast)).write(section.element(ast)).write(section.code(ast));
 }
 
+const _debug = (stream, begin = 0, end) => {
+  let pc = 0;
+  return stream.data.slice(begin, end).map(({ type, value, debug }) => {
+    const pcString = pc.toString(16).padStart(8, "0").padEnd(stream.data.length.toString().length + 1);
+    let valueString;
+    if (Array.isArray(value)) valueString = value.map(v => v.toString(16)).join().padStart(12);else valueString = value.toString(16).padStart(12);
+    const out = `${pcString}: ${valueString} ; ${debug}`;
+    pc += index_16[type] || value.length;
+    return out;
+  }).join("\n") + "\n ============ fin =============";
+};
+
+const debug = _debug;
+
 // Used for deugging purposes
 const getAst = source => {
   const stream = new Stream(source);
@@ -2917,6 +2920,7 @@ const compile = source => {
   return wasm.buffer();
 };
 
+exports.debug = debug;
 exports.getAst = getAst;
 exports.getIR = getIR;
 exports['default'] = compile;
