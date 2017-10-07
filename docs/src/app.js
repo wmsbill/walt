@@ -1,7 +1,7 @@
 import React from "react";
 import Editor from "./editor";
 import "semantic-ui-css/semantic.min.css";
-import { Tab, Container } from "semantic-ui-react";
+import { Tab, Container, Dropdown } from "semantic-ui-react";
 import "./css/app";
 
 const Walt = window.Walt;
@@ -51,6 +51,14 @@ class Explorer extends React.Component {
             code={this.state.code}
             onUpdate={this.handleUpdate}
           />
+        </Tab.Pane>
+      )
+    },
+    {
+      menuItem: "JavaScript",
+      render: () => (
+        <Tab.Pane>
+          <Editor key="js" code={""} onUpdate={() => {}} />
         </Tab.Pane>
       )
     },
@@ -114,10 +122,7 @@ class Explorer extends React.Component {
           <Container fluid>
             <Tab panes={this.panes} />
           </Container>
-        </main>,
-        <footer className="Footer">
-          <Console logs={this.state.logs} />
-        </footer>
+        </main>
       </div>
     );
   }

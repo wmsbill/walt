@@ -1,9 +1,9 @@
 
 $color-primary: #EFDF6B;
 $color-primary--light: #f7efbb;
-$color-secondary: #8cf2b1;
+$color-secondary: #FF9933;
 $color-secondary--light: #c1f8d5;
-$color-black: #333333;
+$color-black: #343530;
 $color-white: #fff;
 
 html,
@@ -39,7 +39,8 @@ body {
     }
 
     &-title {
-      margin-left: 5rem;
+      margin-left: 2rem;
+      margin-top: 2rem;
       color: $color-secondary;
     }
 
